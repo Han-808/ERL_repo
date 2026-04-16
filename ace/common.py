@@ -48,6 +48,24 @@ def parse_actions(lm_output: str) -> list:
     return ["down", "right"]
 
 
+def render_template(template: str, **kwargs) -> str:
+    """
+    Substitute {{ var }} placeholders (Jinja-style, single-line, no logic)
+    with provided values.
+
+    Mirrors the placeholder convention in the ACE paper's Appendix-D
+    prompts: occurrences of `{{ name }}` and `{{name}}` are replaced
+    with str(value).  We avoid `str.format` because the prompt text and
+    runtime payloads (grid feedback, playbook entries) may contain
+    literal braces that would otherwise be misinterpreted.
+    """
+    out = template
+    for key, value in kwargs.items():
+        out = out.replace("{{ " + key + " }}", str(value))
+        out = out.replace("{{" + key + "}}", str(value))
+    return out
+
+
 def format_delta_items(deltas) -> str:
     """
     Format a list of DeltaItem objects as a human-readable block for the

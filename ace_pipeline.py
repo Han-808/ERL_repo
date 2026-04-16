@@ -10,6 +10,7 @@ from pathlib import Path
 from openai import OpenAI
 
 from prompts import build_attempt1_prompt
+from ace.common import render_template
 from ace.methods.ace import (
     Playbook,
     run_reflector,
@@ -27,21 +28,23 @@ _ACE_DIR = Path(__file__).resolve().parent / "ace"
 
 # ----------------------------------------------------------------------
 # Prompt builder for attempt 2 (playbook-guided)
+#
+# Loaded from ace/instruction_generator.md so all prompt strings live in
+# .md files, not in Python.  Mirrors the {{ playbook }} / {{ observation }}
+# placeholder convention used by the paper's Appendix-D Generator prompt.
 # ----------------------------------------------------------------------
 
-def build_attempt2_prompt_with_playbook(observation: str, playbook) -> str:
-    """
-    Per-step prompt for attempt 2 using the full Playbook as guidance.
+_GENERATOR_TEMPLATE = (_ACE_DIR / "instruction_generator.md").read_text(
+    encoding="utf-8"
+)
 
-    Same single-action triple-backtick output format as the ERL prompts.
-    """
-    return (
-        "Strategy Playbook (accumulated knowledge):\n"
-        f"{playbook.to_prompt_string()}\n\n"
-        f"Current grid:\n{observation}\n\n"
-        "Based on the playbook above, choose the next action.\n"
-        "Output your action inside triple backticks on the last line.\n"
-        "Example: '''down'''"
+
+def build_attempt2_prompt_with_playbook(observation: str, playbook) -> str:
+    """Per-step Generator prompt for attempt 2, with the full Playbook injected."""
+    return render_template(
+        _GENERATOR_TEMPLATE,
+        playbook=playbook.to_prompt_string(),
+        observation=observation,
     )
 
 

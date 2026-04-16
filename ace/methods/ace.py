@@ -16,7 +16,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from ace.common import call_lm, format_delta_items
+from ace.common import call_lm, format_delta_items, render_template
 
 
 # ----------------------------------------------------------------------
@@ -290,7 +290,8 @@ def run_reflector(
     lessons for the Curator to approve.
     """
     template = _load_instruction(instruction_path)
-    prompt = template.format(
+    prompt = render_template(
+        template,
         observation=observation,
         actions=actions,
         feedback=feedback,
@@ -325,7 +326,8 @@ def run_curator(
         return []
 
     template = _load_instruction(instruction_path)
-    prompt = template.format(
+    prompt = render_template(
+        template,
         playbook=playbook.to_prompt_string(),
         delta_items=format_delta_items(delta_items),
     )
