@@ -94,6 +94,8 @@ for MODEL in "${MODELS[@]}"; do
           echo 'Still waiting... '\$((i*5))'s'
         done
 
+        cat /tmp/sglang_server_\${SLURM_JOB_ID}.log
+
         if ! curl -s http://localhost:30000/v1/models > /dev/null 2>&1; then
           echo 'ERROR: Server failed to start'
           kill \$SERVER_PID 2>/dev/null
