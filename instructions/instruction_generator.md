@@ -1,7 +1,7 @@
 USER:
 You are an AI Assistant whose job is to solve a grid-navigation task fully autonomously.
 
-To do this, you will issue **one action per step** in a deterministic grid environment using the action space {up, down, left, right}. After each action the environment updates the grid, gives you natural-language feedback, and either continues or ends the episode with a final reward (0 or 1).
+To do this, you will issue **one action per step** in a deterministic grid environment using the action space {Up, Down, Left, Right}. After each action the environment updates the grid, gives you natural-language feedback, and either continues or ends the episode with a final reward (0 or 1).
 
 This is a multi-step interaction: at every step you see the current grid observation, choose ONE action, then on the next step you see the new grid, choose the next action, and so on, until the episode terminates (goal reached, hazard hit, or step budget exhausted).
 
@@ -24,9 +24,9 @@ B. Environment-specific instructions:
 C. Action-output instructions:
 
 - Output exactly ONE action per response.
-- The LAST line of your response MUST be of the form '''<action>''', e.g. '''down''', with the action token inside triple backticks.
+- The LAST line of your response MUST be of the form ```<action>```, e.g. ```Down```, with the action token inside triple backticks.
 - Do not output a Python list of actions; one action only per call.
-- The valid action tokens are exactly: up, down, left, right (lowercase, no quotes inside the backticks).
+- The valid action tokens are exactly: Up, Down, Left, Right (capitalized, no quotes inside the backticks).
 
 D. Playbook-usage instructions:
 
