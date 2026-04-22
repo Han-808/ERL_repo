@@ -13,7 +13,7 @@ from environments.frozen_lake import FrozenLake
 from environments.sokoban import Sokoban
 from ace.notebook import Notebook
 from ace.notebook_updater import call_notebook_updater
-from common import build_client, call_lm, parse_action_single
+from common import build_client, parse_action_single
 
 
 _VALID_ACTIONS = {"Up", "Down", "Left", "Right"}
@@ -94,10 +94,12 @@ class ACENotebookPipeline:
         model: str = "qwen3-8b",
         server_url: str = "http://LOCAL_SERVER/v1",
         reward_threshold: float = 1.0,
+        disable_thinking: bool = False,
     ):
         self.env = env
         self.model = model
         self.reward_threshold = reward_threshold
+        self.disable_thinking = disable_thinking
         self.notebook = Notebook()
         self.client = build_client(server_url)
 
@@ -105,13 +107,31 @@ class ACENotebookPipeline:
         print(f"Model: {self.model}")
         print("ACE Notebook Pipeline ready.")
 
+    def _call_lm(self, prompt: str) -> str:
+        try:
+            request_kwargs = {
+                "model": self.model,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 1024,
+                "temperature": 0.7,
+            }
+            if self.disable_thinking:
+                request_kwargs["extra_body"] = {
+                    "chat_template_kwargs": {"enable_thinking": False},
+                }
+            response = self.client.chat.completions.create(**request_kwargs)
+            return response.choices[0].message.content
+        except Exception as e:
+            print(f"[LM error] {e}")
+            return ""
+
     # -- Step loop -------------------------------------------------------
 
     def _run_attempt(self, build_step_prompt) -> tuple:
         all_actions, all_feedbacks, reward = [], [], 0
         while not self.env.done:
             obs = self.env.get_observation()
-            lm_out = call_lm(self.client, self.model, build_step_prompt(obs))
+            lm_out = self._call_lm(build_step_prompt(obs))
             action = parse_action_single(lm_out)
             all_actions.append(action)
             _, step_feedback, reward, done = self.env.step([action])
