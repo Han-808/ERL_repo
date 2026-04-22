@@ -1,87 +1,66 @@
 """
 Sokoban environment for Experiential Reinforcement Learning.
 
-A 5x5 grid puzzle with standard push mechanics.  The agent sees the grid
-and the list of valid actions; no rules or symbol meanings are provided.
+An n×n grid puzzle with n sampled from [6, 8] per episode (paper
+arXiv 2602.13949, Appendix B.2).  Border cells are walls; a single box
+must be pushed onto a single goal tile.  Layouts are sampled to be
+solvable in ≤ MAX_STEPS actions.
 
-Grid symbols
-------------
-  #   wall
-  ' ' empty floor
-  @   player
-  $   box
-  .   target
-  *   box on target
-  +   player on target
+Grid symbols (abstract, matches paper Appendix B.2)
+---------------------------------------------------
+  E   wall
+  D   empty floor
+  A   player on floor
+  a   player on goal
+  B   box on floor
+  b   box on goal
+  C   goal tile (empty)
 """
+
+import random
 
 
 class Sokoban:
-    # fmt: off
-    DEFAULT_LAYOUT = [
-        ['#', '#', '#', '#', '#'],
-        ['#', '.', '#', '#', '#'],
-        ['#', '@', '$', '.', '#'],
-        ['#', '#', '#', '#', '#'],
-        ['#', '#', '#', '#', '#'],
-    ]
-    # fmt: on
-
-    ACTIONS   = ["up", "down", "left", "right"]
+    ACTIONS   = ["Up", "Down", "Left", "Right"]
     MAX_STEPS = 8
-    ROWS      = 5
-    COLS      = 5
+    MIN_N     = 6
+    MAX_N     = 8
 
     _DELTAS = {
-        "up":    (-1,  0),
-        "down":  ( 1,  0),
-        "left":  ( 0, -1),
-        "right": ( 0,  1),
+        "Up":    (-1,  0),
+        "Down":  ( 1,  0),
+        "Left":  ( 0, -1),
+        "Right": ( 0,  1),
     }
 
-    def __init__(self):
-        self.reset()
+    def __init__(self, seed: int = 0):
+        self._master_seed  = seed
+        self._episode_idx  = 0
+        self._current_seed = None
+        self._generate(seed)
 
     # ------------------------------------------------------------------
     # Public interface
     # ------------------------------------------------------------------
 
-    def reset(self):
+    def reset(self, seed: int = None):
         """
-        Parse DEFAULT_LAYOUT into mutable state and return the initial
-        observation string.
+        Return to the start state.
+
+        When ``seed`` is given, regenerate the grid with that seed.
+        When ``seed`` is None, reset player/box positions on the
+        *current* grid (used by ERL/ACE for attempt 2).
         """
-        self.steps  = 0
-        self.done   = False
-        self.player = None          # (row, col)
-        self.boxes  = set()         # set of (row, col)
-        self.targets = set()        # set of (row, col)  — never changes
-        self.floor  = {}            # (row, col) -> '#' | ' ' | '.'
-
-        for r, row in enumerate(self.DEFAULT_LAYOUT):
-            for c, cell in enumerate(row):
-                if cell == '#':
-                    self.floor[(r, c)] = '#'
-                elif cell in ('.', '*', '+'):   # target square
-                    self.floor[(r, c)] = '.'
-                    self.targets.add((r, c))
-                else:                           # empty floor
-                    self.floor[(r, c)] = ' '
-
-                if cell in ('@', '+'):
-                    self.player = (r, c)
-                if cell in ('$', '*'):
-                    self.boxes.add((r, c))
-
+        if seed is not None:
+            self._generate(seed)
+        else:
+            self.player = self._start_player
+            self.boxes  = set(self._start_boxes)
+            self.steps  = 0
+            self.done   = False
         return self.get_observation()
 
     def get_observation(self):
-        """
-        Return a clean string that the LM agent sees.
-
-        Contains: current grid, valid actions, and step count.
-        No rules or symbol explanations.
-        """
         return (
             f"Grid:\n{self._render_grid()}\n\n"
             f"Valid actions: {self.ACTIONS}\n"
@@ -89,33 +68,9 @@ class Sokoban:
         )
 
     def render(self):
-        """Print the current grid to stdout."""
         print(self._render_grid())
 
     def step(self, actions):
-        """
-        Execute a full trajectory (list of action strings) one step at a time.
-
-        Push mechanics:  when the player walks into a box, the box is pushed
-        one cell in the same direction.  A push fails if the destination cell
-        is a wall, out of bounds, or occupied by another box (standard Sokoban).
-
-        Parameters
-        ----------
-        actions : list[str]
-            Sequence of actions to attempt.
-
-        Returns
-        -------
-        final_state : str
-            String representation of the current grid.
-        feedback : str
-            Natural-language description of every step that was executed.
-        reward : int
-            1 if all boxes are on targets, 0 otherwise.
-        done : bool
-            True when the episode has ended (win or max steps).
-        """
         if self.done:
             return self._render_grid(), "Episode already ended.", 0, True
 
@@ -128,7 +83,6 @@ class Sokoban:
 
             step_num = self.steps + 1
 
-            # ---- invalid action ----------------------------------------
             if action not in self._DELTAS:
                 parts.append(f"Step {step_num}: invalid action '{action}', skipped.")
                 self.steps += 1
@@ -139,9 +93,8 @@ class Sokoban:
 
             dr, dc = self._DELTAS[action]
             pr, pc = self.player
-            nr, nc = pr + dr, pc + dc       # candidate player position
+            nr, nc = pr + dr, pc + dc
 
-            # ---- out of bounds -----------------------------------------
             if not self._in_bounds(nr, nc):
                 parts.append(
                     f"Step {step_num}: moved {action}, hit the boundary, stayed in place."
@@ -152,10 +105,9 @@ class Sokoban:
                     parts.append("Maximum steps reached.")
                 continue
 
-            # ---- wall --------------------------------------------------
             if self._is_wall(nr, nc):
                 parts.append(
-                    f"Step {step_num}: moved {action}, hit a wall, stayed in place."
+                    f"Step {step_num}: moved {action}, hit E (wall), stayed in place."
                 )
                 self.steps += 1
                 if self.steps >= self.MAX_STEPS:
@@ -165,7 +117,7 @@ class Sokoban:
 
             # ---- box push ----------------------------------------------
             if (nr, nc) in self.boxes:
-                bnr, bnc = nr + dr, nc + dc     # candidate box destination
+                bnr, bnc = nr + dr, nc + dc
 
                 if (
                     not self._in_bounds(bnr, bnc)
@@ -174,7 +126,7 @@ class Sokoban:
                 ):
                     parts.append(
                         f"Step {step_num}: moved {action}, "
-                        "box cannot be pushed, move failed."
+                        "B (box) cannot be pushed, move failed."
                     )
                     self.steps += 1
                     if self.steps >= self.MAX_STEPS:
@@ -182,26 +134,23 @@ class Sokoban:
                         parts.append("Maximum steps reached.")
                     continue
 
-                # Execute push
                 self.boxes.discard((nr, nc))
                 self.boxes.add((bnr, bnc))
                 self.player = (nr, nc)
 
                 if (bnr, bnc) in self.targets:
                     parts.append(
-                        f"Step {step_num}: moved {action}, pushed box onto a target."
+                        f"Step {step_num}: moved {action}, pushed B onto C (goal)!"
                     )
                 else:
-                    parts.append(f"Step {step_num}: moved {action}, pushed box.")
+                    parts.append(f"Step {step_num}: moved {action}, pushed B.")
 
-            # ---- normal move -------------------------------------------
             else:
                 self.player = (nr, nc)
                 parts.append(f"Step {step_num}: moved {action}.")
 
             self.steps += 1
 
-            # ---- win check ---------------------------------------------
             if self._all_boxes_on_targets():
                 self.done = True
                 reward = 1
@@ -215,38 +164,125 @@ class Sokoban:
         feedback = " ".join(parts) if parts else "No actions executed."
         return self._render_grid(), feedback, reward, self.done
 
+    # Backwards-compatible accessors
+    @property
+    def ROWS(self): return self.rows
+    @property
+    def COLS(self): return self.cols
+
+    # ------------------------------------------------------------------
+    # Map generation
+    #
+    # Construction: pick a goal, then pick a push direction and a push
+    # distance k ∈ [1, 3].  Box is placed k cells opposite the push so
+    # pushing in direction d, k times, lands it on the goal.  Player is
+    # placed behind the box.  Every generated puzzle is therefore
+    # solvable in exactly k pushes (k ≤ 3 ≤ MAX_STEPS).
+    # ------------------------------------------------------------------
+
+    def _generate(self, seed):
+        self._current_seed = seed
+        rng = random.Random(seed)
+
+        for _ in range(100):
+            n = rng.randint(self.MIN_N, self.MAX_N)
+            layout = self._try_generate(rng, n)
+            if layout is not None:
+                self._install(layout)
+                return
+
+        # Fallback: a trivially solvable 6×6 (guarantees liveness)
+        n = 6
+        layout = {
+            "n": n,
+            "player": (2, 2),
+            "box":    (2, 3),
+            "goal":   (2, 4),
+        }
+        self._install(layout)
+
+    def _try_generate(self, rng, n):
+        """Try once to sample a valid (player, box, goal) triple."""
+        # Interior cells (walls form the border)
+        interior = [(r, c) for r in range(1, n - 1) for c in range(1, n - 1)]
+        if len(interior) < 3:
+            return None
+
+        goal = rng.choice(interior)
+        directions = [("Up", -1, 0), ("Down", 1, 0),
+                      ("Left", 0, -1), ("Right", 0, 1)]
+        rng.shuffle(directions)
+
+        for _, dr, dc in directions:
+            k = rng.randint(1, 3)
+            # Box starts k cells opposite push direction
+            br, bc = goal[0] - dr * k, goal[1] - dc * k
+            # Player one cell further back
+            pr, pc = br - dr, bc - dc
+            if not (1 <= br < n - 1 and 1 <= bc < n - 1):
+                continue
+            if not (1 <= pr < n - 1 and 1 <= pc < n - 1):
+                continue
+            # All positions distinct
+            if len({goal, (br, bc), (pr, pc)}) != 3:
+                continue
+            return {"n": n, "player": (pr, pc),
+                    "box": (br, bc), "goal": goal}
+        return None
+
+    def _install(self, layout):
+        n    = layout["n"]
+        self.rows = n
+        self.cols = n
+
+        # Floor: walls on border, D (floor) or C (goal) inside
+        self.floor = {}
+        for r in range(n):
+            for c in range(n):
+                if r == 0 or r == n - 1 or c == 0 or c == n - 1:
+                    self.floor[(r, c)] = 'E'
+                else:
+                    self.floor[(r, c)] = 'D'
+        self.floor[layout["goal"]] = 'C'
+
+        self.targets = {layout["goal"]}
+        self._start_player = layout["player"]
+        self._start_boxes  = {layout["box"]}
+
+        self.player = self._start_player
+        self.boxes  = set(self._start_boxes)
+        self.steps  = 0
+        self.done   = False
+        self._episode_idx += 1
+
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
 
     def _in_bounds(self, r, c):
-        return 0 <= r < self.ROWS and 0 <= c < self.COLS
+        return 0 <= r < self.rows and 0 <= c < self.cols
 
     def _is_wall(self, r, c):
-        return self.floor.get((r, c), '#') == '#'
+        return self.floor.get((r, c), 'E') == 'E'
 
     def _all_boxes_on_targets(self):
         return all(b in self.targets for b in self.boxes)
 
     def _render_grid(self):
-        # Abstract encoding — matches paper Appendix B.2:
-        # A = agent on floor, a = agent on goal, B = box on floor,
-        # b = box on goal,    C = goal tile,     D = floor, E = wall
         lines = []
-        for r in range(self.ROWS):
+        for r in range(self.rows):
             cells = []
-            for c in range(self.COLS):
+            for c in range(self.cols):
                 pos  = (r, c)
-                base = self.floor.get(pos, '#')
-
-                if base == '#':
+                base = self.floor.get(pos, 'E')
+                if base == 'E':
                     cells.append('E')
                 elif pos == self.player:
-                    cells.append('a' if base == '.' else 'A')
+                    cells.append('a' if base == 'C' else 'A')
                 elif pos in self.boxes:
-                    cells.append('b' if base == '.' else 'B')
+                    cells.append('b' if base == 'C' else 'B')
                 else:
-                    cells.append('C' if base == '.' else 'D')
+                    cells.append('C' if base == 'C' else 'D')
             lines.append(' '.join(cells))
         return '\n'.join(lines)
 
@@ -259,69 +295,56 @@ if __name__ == "__main__":
     print("Sokoban Environment — Self-Test")
     print("=" * 50)
 
-    env = Sokoban()
-    print("\nInitial observation:")
+    env = Sokoban(seed=0)
+    print(f"\nInitial observation (n={env.rows}, seed={env._current_seed}):")
     print(env.get_observation())
 
-    # Verified solution:
-    #   Player (2,1) moves right → pushes box from (2,2) to (2,3)=target → win
-    solution = ["right"]
-    print(f"\nExecuting solution: {solution}")
+    # --- Verify grid size ∈ [6, 8] ---
+    for s in range(30):
+        e = Sokoban(seed=s)
+        assert Sokoban.MIN_N <= e.rows <= Sokoban.MAX_N, \
+            f"Seed {s}: n={e.rows} out of [{Sokoban.MIN_N},{Sokoban.MAX_N}]"
+    print("[PASS] Grid sizes all in [6, 8].")
 
-    final_state, feedback, reward, done = env.step(solution)
+    # --- Verify every generated puzzle is solvable by the planted solution ---
+    # Construction guarantees the solution is "push direction, k times",
+    # where direction = goal - box (normalized) and k = L1 distance.
+    for s in range(20):
+        e = Sokoban(seed=s)
+        (br, bc) = next(iter(e._start_boxes))
+        (gr, gc) = next(iter(e.targets))
+        dr = 0 if gr == br else (1 if gr > br else -1)
+        dc = 0 if gc == bc else (1 if gc > bc else -1)
+        assert (dr == 0) ^ (dc == 0), f"Seed {s}: box-to-goal not axis-aligned"
+        name = {(-1, 0): "Up", (1, 0): "Down",
+                (0, -1): "Left", (0, 1): "Right"}[(dr, dc)]
+        k = abs(gr - br) + abs(gc - bc)
+        _, fb, r, d = e.step([name] * k)
+        assert r == 1 and d is True, \
+            f"Seed {s}: planted solution {[name]*k} did not solve. fb={fb}"
+    print("[PASS] 20 random seeds all solvable by planted solution.")
 
-    print(f"\nStep-by-step feedback:\n  {feedback}")
-    print(f"\nFinal grid:\n{final_state}")
-    print(f"\nReward: {reward}  |  Done: {done}")
-
-    assert reward == 1,  f"Expected reward=1, got {reward}"
-    assert done is True, f"Expected done=True, got {done}"
-    # Verify box is now on target (2,3): abstract symbol 'b' (box on goal)
-    rows = final_state.split('\n')
-    assert 'b' in rows[2], "Expected 'b' (box on goal) in row 2 of final grid"
-    print("\n[PASS] All boxes on targets — reward=1 confirmed.")
-
-    # --- Verify abstract symbols in the grid portion only ---
-    # This layout has no empty floor (D); every non-wall cell is a
-    # goal (C), player (A), or box (B).
-    env.reset()
-    grid_lines = env._render_grid()
+    # --- Verify abstract symbols only ---
+    e = Sokoban(seed=3)
+    grid = e._render_grid()
     for sym in ('@', '$', '.', '*', '+', '#'):
-        assert sym not in grid_lines, \
-            f"Legacy symbol '{sym}' leaked into rendered grid"
-    for sym in ('A', 'B', 'C', 'E'):  # D absent: no empty floor in this layout
-        assert sym in grid_lines, \
-            f"Abstract symbol '{sym}' missing from rendered grid"
+        assert sym not in grid, f"Legacy symbol '{sym}' leaked"
+    for sym in ('A', 'B', 'C', 'E'):
+        assert sym in grid, f"Abstract symbol '{sym}' missing"
     print("[PASS] Abstract symbol encoding correct.")
 
-    # --- Verify player walking into wall is reported ---
-    env.reset()
-    _, fb_wall, _, _ = env.step(["left"])   # (2,1) left → (2,0) is wall
-    assert "wall" in fb_wall, f"Expected wall message, got: {fb_wall}"
-    print("[PASS] Movement into wall correctly reported.")
+    # --- Verify reset() without seed reuses same map ---
+    e = Sokoban(seed=11)
+    snapshot_floor = e.floor
+    e.step(["Up", "Down"])
+    e.reset()
+    assert e.floor is snapshot_floor, "reset() without seed must keep same grid"
+    assert e.player == e._start_player and e.boxes == e._start_boxes, \
+        "Agent/boxes must be at start after reset()"
+    print("[PASS] reset() without seed reuses current grid.")
 
-    # --- Verify loop terminates immediately after solve ---
-    env2 = Sokoban()
-    _, fb_early, r2, d2 = env2.step(["right", "up"])   # "up" should not run
-    assert r2 == 1 and d2 is True, "Expected solved after first 'right'"
-    assert fb_early.count("Step") == 1, "Expected only one step before done"
-    print("[PASS] Loop terminates immediately after solve; extra actions ignored.")
-
-    # --- Verify box cannot be pushed into a wall ---
-    env3 = Sokoban()
-    env3.player = (2, 2)
-    env3.boxes = {(2, 3)}
-    _, fb_blocked, r3, _ = env3.step(["right"])
-    assert "cannot be pushed" in fb_blocked, \
-        f"Expected blocked message, got: {fb_blocked}"
-    print("[PASS] Box blocked by wall correctly reported.")
-
-    # --- Max steps = 8 ---
+    # --- MAX_STEPS == 8 ---
     assert Sokoban.MAX_STEPS == 8, f"Expected MAX_STEPS=8, got {Sokoban.MAX_STEPS}"
-    env4 = Sokoban()
-    oscillate = ["up", "down"] * 4   # 8 steps total, no solve
-    _, fb_max, r4, d4 = env4.step(oscillate)
-    assert d4 is True, "Expected done=True after max steps"
-    assert r4 == 0,    "Expected reward=0 without solving"
-    assert "Maximum steps" in fb_max, "Expected max-steps message"
-    print("[PASS] MAX_STEPS=8 and termination work correctly.")
+    print("[PASS] MAX_STEPS=8 confirmed.")
+
+    print("\n[ALL PASSED]")

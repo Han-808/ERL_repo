@@ -4,3 +4,5 @@ __pycache__/
 results_*.json
 .venv/
 .env
+.claude/
+outputs/
