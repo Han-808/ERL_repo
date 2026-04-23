@@ -64,7 +64,7 @@ def call_lm(client, model: str, prompt: str,
         request_kwargs = {
             "model": model,
             "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 1024,
+            "max_tokens": 512,
             "temperature": 0.7,
         }
         if disable_thinking:
