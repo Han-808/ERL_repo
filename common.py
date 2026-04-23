@@ -50,20 +50,28 @@ def build_client(server_url: str) -> OpenAI:
     return OpenAI(base_url=server_url, api_key="EMPTY")
 
 
-def call_lm(client, model: str, prompt: str) -> str:
+def call_lm(client, model: str, prompt: str,
+            disable_thinking: bool = False) -> str:
     """
     Send a prompt to the LM and return the response text.
 
     Identical parameters across ERL and ACE (max_tokens=1024,
-    temperature=0.7).  Returns "" on failure.
+    temperature=0.7).  For Qwen3-style chat templates, disable_thinking
+    sends enable_thinking=False through SGLang's OpenAI-compatible API.
+    Returns "" on failure.
     """
     try:
-        response = client.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=1024,
-            temperature=0.7,
-        )
+        request_kwargs = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 1024,
+            "temperature": 0.7,
+        }
+        if disable_thinking:
+            request_kwargs["extra_body"] = {
+                "chat_template_kwargs": {"enable_thinking": False},
+            }
+        response = client.chat.completions.create(**request_kwargs)
         return response.choices[0].message.content
     except Exception as e:
         print(f"[LM error] {e}")

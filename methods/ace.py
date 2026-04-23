@@ -29,9 +29,6 @@ from common import (
     render_template,
     summarize_logs,
 )
-from prompts import build_attempt1_prompt
-
-
 _INSTRUCTIONS_DIR = Path(__file__).resolve().parents[1] / "instructions"
 
 
@@ -285,6 +282,7 @@ def run_reflector(
     reward: int,
     playbook: Playbook,
     instruction_path: str,
+    disable_thinking: bool = False,
 ) -> list:
     """Critique a trajectory and propose delta updates to the playbook."""
     template = _load_instruction(instruction_path)
@@ -296,7 +294,9 @@ def run_reflector(
         reward=reward,
         playbook=playbook.to_prompt_string(),
     )
-    raw = call_lm(lm_client, model, prompt)
+    raw = call_lm(
+        lm_client, model, prompt, disable_thinking=disable_thinking
+    )
     print(f"\n[Reflector raw]\n{raw}")
     return _parse_delta_items(raw)
 
@@ -311,6 +311,7 @@ def run_curator(
     delta_items: list,
     playbook: Playbook,
     instruction_path: str,
+    disable_thinking: bool = False,
 ) -> list:
     """Filter / refine the Reflector's proposals."""
     if not delta_items:
@@ -321,7 +322,9 @@ def run_curator(
         playbook=playbook.to_prompt_string(),
         delta_items=format_delta_items(delta_items),
     )
-    raw = call_lm(lm_client, model, prompt)
+    raw = call_lm(
+        lm_client, model, prompt, disable_thinking=disable_thinking
+    )
     print(f"\n[Curator raw]\n{raw}")
     return _parse_delta_items(raw)
 
@@ -394,11 +397,13 @@ class ACEMethod(BaseMethod):
         server_url: str = "http://LOCAL_SERVER/v1",
         reward_threshold: float = 1.0,
         refine_every: int = 5,
+        disable_thinking: bool = False,
     ):
         self.env = env
         self.model = model
         self.reward_threshold = reward_threshold
         self.refine_every = refine_every
+        self.disable_thinking = disable_thinking
         self.playbook = self.initialize_context()
         self.episode_logs = []
 
@@ -425,7 +430,10 @@ class ACEMethod(BaseMethod):
 
         while not self.env.done:
             obs = self.env.get_observation()
-            lm_out = call_lm(self.client, self.model, build_step_prompt(obs))
+            lm_out = call_lm(
+                self.client, self.model, build_step_prompt(obs),
+                disable_thinking=self.disable_thinking,
+            )
             action = parse_action_single(lm_out)
             all_actions.append(action)
             _, step_feedback, reward, done = self.env.step([action])
@@ -439,7 +447,12 @@ class ACEMethod(BaseMethod):
 
     def run_episode(self, episode_num: int) -> dict:
         initial_obs = self.env.reset(seed=episode_num)
-        actions1, feedback1, reward1 = self._run_attempt(build_attempt1_prompt)
+        # Online ACE evaluation: solve each new stage using the playbook
+        # accumulated before seeing this stage. The running attempt-1 curve is
+        # therefore the average pass rate over the first K online stages.
+        actions1, feedback1, reward1 = self._run_attempt(
+            lambda obs: build_attempt2_prompt_with_playbook(obs, self.playbook)
+        )
 
         print(f"\n{'='*40}")
         print(f"=== Episode {episode_num} ===")
@@ -448,33 +461,33 @@ class ACEMethod(BaseMethod):
         print(f"[Attempt 1] Feedback: {feedback1}")
         print(f"[Attempt 1] Reward:   {reward1}")
 
+        delta_items = run_reflector(
+            self.client, self.model,
+            initial_obs, actions1, feedback1, reward1,
+            self.playbook, self.reflector_instruction,
+            disable_thinking=self.disable_thinking,
+        )
+        print(f"[Reflector] Proposed {len(delta_items)} delta items")
+
+        approved_deltas = run_curator(
+            self.client, self.model,
+            delta_items, self.playbook, self.curator_instruction,
+            disable_thinking=self.disable_thinking,
+        )
+        print(f"[Curator] Approved {len(approved_deltas)} delta items")
+
+        self.playbook.apply_delta(approved_deltas)
+        print(f"[Playbook] Size now: {len(self.playbook.items)}")
+
+        if self.refine_every > 0 and episode_num % self.refine_every == 0:
+            grow_and_refine(self.playbook)
+
         if reward1 >= self.reward_threshold:
-            print("[Gated] Attempt 1 succeeded. Skipping reflection and attempt 2.")
-            approved_deltas = []
+            print("[Gated] Attempt 1 succeeded. Skipping retry.")
             actions2, feedback2, reward2 = actions1, feedback1, reward1
             gated = True
         else:
             gated = False
-
-            delta_items = run_reflector(
-                self.client, self.model,
-                initial_obs, actions1, feedback1, reward1,
-                self.playbook, self.reflector_instruction,
-            )
-            print(f"[Reflector] Proposed {len(delta_items)} delta items")
-
-            approved_deltas = run_curator(
-                self.client, self.model,
-                delta_items, self.playbook, self.curator_instruction,
-            )
-            print(f"[Curator] Approved {len(approved_deltas)} delta items")
-
-            self.playbook.apply_delta(approved_deltas)
-            print(f"[Playbook] Size now: {len(self.playbook.items)}")
-
-            if self.refine_every > 0 and episode_num % self.refine_every == 0:
-                grow_and_refine(self.playbook)
-
             self.env.reset()
             actions2, feedback2, reward2 = self._run_attempt(
                 lambda obs: build_attempt2_prompt_with_playbook(obs, self.playbook)

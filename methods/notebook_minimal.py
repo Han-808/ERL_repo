@@ -266,11 +266,13 @@ class NotebookMinimalMethod(BaseMethod):
         server_url: str = "http://LOCAL_SERVER/v1",
         reward_threshold: float = 1.0,
         initial_notebook: str = "default",
+        disable_thinking: bool = False,
     ):
         self.env = env
         self.model = model
         self.reward_threshold = reward_threshold
         self.initial_notebook = initial_notebook
+        self.disable_thinking = disable_thinking
         self.notebook = self.initialize_context()
         self.client = build_client(server_url)
 
@@ -298,7 +300,10 @@ class NotebookMinimalMethod(BaseMethod):
         while not self.env.done:
             obs = self.env.get_observation()
             prompt = build_notebook_agent_prompt(obs, self.notebook)
-            raw = call_lm(self.client, self.model, prompt)
+            raw = call_lm(
+                self.client, self.model, prompt,
+                disable_thinking=self.disable_thinking,
+            )
             action = parse_action_single(raw)
             actions.append(action)
             _, step_fb, reward, done = self.env.step([action])
@@ -318,7 +323,10 @@ class NotebookMinimalMethod(BaseMethod):
             reward=reward,
             reward_threshold=self.reward_threshold,
         )
-        raw = call_lm(self.client, self.model, prompt)
+        raw = call_lm(
+            self.client, self.model, prompt,
+            disable_thinking=self.disable_thinking,
+        )
         if not raw.strip():
             print("[notebook_minimal] empty updater response; no edit.")
             return ""

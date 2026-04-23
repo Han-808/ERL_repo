@@ -55,7 +55,12 @@ ENVS = {
 def run_experiment(method_name: str, env_name: str, args) -> None:
     method_cls, size_field, size_header = METHODS[method_name]
     env = ENVS[env_name]()
-    method = method_cls(env, model=args.model, server_url=args.server)
+    method = method_cls(
+        env,
+        model=args.model,
+        server_url=args.server,
+        disable_thinking=args.disable_thinking,
+    )
     results = method.run(args.episodes)
 
     print_episode_table(
@@ -95,6 +100,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--outputs-dir", dest="outputs_dir", default="./outputs",
         help="Where to write results_<method>_<env>.json (default: ./outputs).",
+    )
+    parser.add_argument(
+        "--disable-thinking",
+        action="store_true",
+        help=(
+            "Disable Qwen3 thinking via SGLang chat_template_kwargs "
+            "enable_thinking=False for every LM call."
+        ),
     )
     return parser
 
