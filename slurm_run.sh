@@ -56,7 +56,7 @@ for MODEL in "${MODELS[@]}"; do
       --account="$ACCOUNT"
       --nodes=1
       --ntasks=1
-      --gpus-per-task="l40:1"
+      --gpus-per-task="l40s:1"
       --cpus-per-task=8
       --mem=64G
       --time="$TIME_LIMIT"
