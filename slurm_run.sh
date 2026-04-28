@@ -69,12 +69,12 @@ for MODEL in "${MODELS[@]}"; do
         export CUDA_HOME=/sw/cuda/12.4.1
         export LD_LIBRARY_PATH=/sw/cuda/12.4.1/lib64:\$LD_LIBRARY_PATH
         module load gcc/13.2.0
-        source /tmp/sglang-conda/bin/activate
+        export PATH=/tmp/sglang-conda/bin:\$PATH
         export HF_HOME=/tmp/mohanc3-xdg-cache/huggingface
         export PYTHONUNBUFFERED=1
 
         echo 'Starting SGLang server for ${MODEL}...'
-        sglang serve \
+        /tmp/sglang-conda/bin/sglang serve \
           --model-path '${MODEL}' \
           --host 0.0.0.0 \
           --port 30000 \

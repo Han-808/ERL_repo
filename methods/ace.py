@@ -4,8 +4,8 @@ ACE (Agentic Context Engineering) method — BaseMethod-compatible.
 Paper: "Agentic Context Engineering: Evolving Contexts for
 Self-Improving Language Models" — arXiv 2510.04618.
 
-Consolidates the Playbook bullet structure, delta updates, Reflector
-and Curator roles, the grow-and-refine de-duplication pass, and the
+Consolidates the Playbook bullet structure, Reflector diagnosis,
+Curator delta updates, the grow-and-refine de-duplication pass, and the
 two-attempt episode loop into a single module — mirroring the way
 methods/ace.py is organized in the appworld-context-updater template.
 
@@ -16,6 +16,7 @@ Sections referenced below:
 """
 
 import difflib
+import json
 import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -24,7 +25,6 @@ from common import (
     BaseMethod,
     build_client,
     call_lm,
-    format_delta_items,
     parse_action_single,
     render_template,
     summarize_logs,
@@ -53,7 +53,7 @@ class PlaybookItem:
 
 @dataclass
 class DeltaItem:
-    """A proposed change to the playbook emitted by Reflector / Curator."""
+    """A proposed change to the playbook emitted by the Curator."""
     operation: str            # "ADD" | "MODIFY" | "DELETE"
     id: int                   # target bullet id; -1 for ADD
     content: str              # new text; "" for DELETE
@@ -69,8 +69,8 @@ class Playbook:
     Ordered collection of PlaybookItems with stable integer ids.
 
     The playbook is the evolving context described in the paper: the
-    Generator reads it, the Reflector proposes deltas, the Curator
-    approves, and apply_delta merges them in deterministically.
+    Generator reads it, the Reflector diagnoses trajectories, the
+    Curator proposes deltas, and apply_delta merges them deterministically.
     """
 
     def __init__(self):
@@ -169,6 +169,8 @@ class Playbook:
 _OP_RE = re.compile(r"^\s*\[(ADD|MODIFY|DELETE)\]\s*(.*)$", re.IGNORECASE)
 _ID_RE = re.compile(r"id\s*=\s*(\d+)", re.IGNORECASE)
 _REASON_RE = re.compile(r"^\s*reason\s*:\s*(.*)$", re.IGNORECASE)
+_JSON_FENCE_RE = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL)
+_PLAYBOOK_LINE_RE = re.compile(r"playbook|relevant entries|entry ids?", re.IGNORECASE)
 
 
 def _parse_delta_items(text: str) -> list:
@@ -249,6 +251,171 @@ def _parse_delta_items(text: str) -> list:
     return cleaned
 
 
+def _extract_json_payload(raw: str) -> dict:
+    """
+    Extract a JSON object from an LM response.
+
+    The Reflector prompt asks for a fenced JSON block, but local models may
+    add small wrappers. This keeps the pipeline robust without letting the
+    Reflector emit playbook deltas directly.
+    """
+    if not raw:
+        return {}
+
+    m = _JSON_FENCE_RE.search(raw)
+    if m:
+        try:
+            return json.loads(m.group(1))
+        except json.JSONDecodeError:
+            pass
+
+    depth, start = 0, -1
+    for i, ch in enumerate(raw):
+        if ch == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "}" and depth > 0:
+            depth -= 1
+            if depth == 0 and start >= 0:
+                try:
+                    return json.loads(raw[start:i + 1])
+                except json.JSONDecodeError:
+                    start = -1
+    return {}
+
+
+def _empty_reflection(raw: str = "") -> dict:
+    return {
+        "reasoning": raw.strip(),
+        "error_identification": "",
+        "root_cause_analysis": "",
+        "correct_approach": "",
+        "key_insight": "no new playbook insight",
+        "playbook_feedback": [],
+    }
+
+
+def _normalize_reflection(raw: str) -> dict:
+    payload = _extract_json_payload(raw)
+    if not payload:
+        return _empty_reflection(
+            "Reflector output was not valid JSON; no structured diagnosis available."
+        )
+
+    reflection = _empty_reflection()
+    for key in (
+        "reasoning",
+        "error_identification",
+        "root_cause_analysis",
+        "correct_approach",
+        "key_insight",
+    ):
+        value = payload.get(key, "")
+        reflection[key] = str(value).strip()
+
+    feedback = payload.get("playbook_feedback", [])
+    reflection["playbook_feedback"] = feedback if isinstance(feedback, list) else []
+    return reflection
+
+
+def _extract_generator_playbook_ids(lm_output: str, valid_ids: set) -> list:
+    """Find playbook ids the Generator explicitly mentioned in its reasoning."""
+    if not lm_output or not valid_ids:
+        return []
+
+    found = set()
+    for line in lm_output.splitlines():
+        if not _PLAYBOOK_LINE_RE.search(line):
+            continue
+        if "none" in line.lower() and not re.search(r"\d", line):
+            continue
+        for m in re.finditer(r"\b\d+\b", line):
+            item_id = int(m.group(0))
+            if item_id in valid_ids:
+                found.add(item_id)
+    return sorted(found)
+
+
+def _format_generator_trace(step_traces: list) -> str:
+    if not step_traces:
+        return "(no generator trace captured)"
+
+    chunks = []
+    for tr in step_traces:
+        ids = tr.get("playbook_ids", [])
+        ids_text = ids if ids else "none"
+        chunks.append(
+            f"Step {tr.get('step')} action: {tr.get('action')}\n"
+            f"Referenced playbook ids: {ids_text}\n"
+            f"Generator raw output:\n{tr.get('raw_output', '')}"
+        )
+    return "\n\n---\n\n".join(chunks)
+
+
+def _apply_playbook_feedback(
+    playbook: Playbook,
+    reflection: dict,
+    generator_traces: list,
+    reward: int,
+    reward_threshold: float,
+) -> dict:
+    """
+    Update helpful/harmful counters.
+
+    Prefer Reflector labels because they are the ACE-style credit signal. If
+    the model omits labels, fall back to episode-level credit for Generator-
+    referenced ids so the metadata is still useful.
+    """
+    valid_ids = {it.id for it in playbook.items}
+    stats = {"helpful": 0, "harmful": 0, "neutral": 0, "fallback": False}
+    if not valid_ids:
+        return stats
+
+    seen = set()
+    feedback = reflection.get("playbook_feedback", [])
+    if isinstance(feedback, list):
+        for item in feedback:
+            if not isinstance(item, dict):
+                continue
+            try:
+                item_id = int(item.get("id"))
+            except (TypeError, ValueError):
+                continue
+            if item_id not in valid_ids or item_id in seen:
+                continue
+            label = str(item.get("label", "")).strip().lower()
+            seen.add(item_id)
+            if label == "helpful":
+                playbook.mark_helpful(item_id)
+                stats["helpful"] += 1
+            elif label == "harmful":
+                playbook.mark_harmful(item_id)
+                stats["harmful"] += 1
+            else:
+                stats["neutral"] += 1
+
+    if seen:
+        return stats
+
+    referenced = set()
+    for tr in generator_traces:
+        referenced.update(i for i in tr.get("playbook_ids", []) if i in valid_ids)
+    if not referenced:
+        return stats
+
+    stats["fallback"] = True
+    if reward >= reward_threshold:
+        for item_id in referenced:
+            playbook.mark_helpful(item_id)
+        stats["helpful"] = len(referenced)
+    else:
+        for item_id in referenced:
+            playbook.mark_harmful(item_id)
+        stats["harmful"] = len(referenced)
+    return stats
+
+
 # ----------------------------------------------------------------------
 # Prompt loading
 # ----------------------------------------------------------------------
@@ -280,11 +447,12 @@ def run_reflector(
     actions: list,
     feedback: str,
     reward: int,
+    generator_trace: str,
     playbook: Playbook,
     instruction_path: str,
     disable_thinking: bool = False,
-) -> list:
-    """Critique a trajectory and propose delta updates to the playbook."""
+) -> dict:
+    """Critique a trajectory and return a structured reflection."""
     template = _load_instruction(instruction_path)
     prompt = render_template(
         template,
@@ -292,13 +460,14 @@ def run_reflector(
         actions=actions,
         feedback=feedback,
         reward=reward,
+        generator_trace=generator_trace,
         playbook=playbook.to_prompt_string(),
     )
     raw = call_lm(
         lm_client, model, prompt, disable_thinking=disable_thinking
     )
     print(f"\n[Reflector raw]\n{raw}")
-    return _parse_delta_items(raw)
+    return _normalize_reflection(raw)
 
 
 # ----------------------------------------------------------------------
@@ -308,19 +477,19 @@ def run_reflector(
 def run_curator(
     lm_client,
     model: str,
-    delta_items: list,
+    reflection: dict,
     playbook: Playbook,
     instruction_path: str,
     disable_thinking: bool = False,
 ) -> list:
-    """Filter / refine the Reflector's proposals."""
-    if not delta_items:
+    """Turn the Reflector's diagnosis into approved playbook deltas."""
+    if not reflection:
         return []
     template = _load_instruction(instruction_path)
     prompt = render_template(
         template,
         playbook=playbook.to_prompt_string(),
-        delta_items=format_delta_items(delta_items),
+        reflection=json.dumps(reflection, indent=2),
     )
     raw = call_lm(
         lm_client, model, prompt, disable_thinking=disable_thinking
@@ -426,6 +595,7 @@ class ACEMethod(BaseMethod):
     def _run_attempt(self, build_step_prompt) -> tuple:
         all_actions = []
         all_feedbacks = []
+        generator_traces = []
         reward = 0
 
         while not self.env.done:
@@ -436,12 +606,20 @@ class ACEMethod(BaseMethod):
             )
             action = parse_action_single(lm_out)
             all_actions.append(action)
+            generator_traces.append({
+                "step": len(all_actions),
+                "action": action,
+                "playbook_ids": _extract_generator_playbook_ids(
+                    lm_out, {it.id for it in self.playbook.items}
+                ),
+                "raw_output": lm_out,
+            })
             _, step_feedback, reward, done = self.env.step([action])
             all_feedbacks.append(step_feedback)
             if done:
                 break
 
-        return all_actions, " ".join(all_feedbacks), reward
+        return all_actions, " ".join(all_feedbacks), reward, generator_traces
 
     # -- Episode loop -------------------------------------------------------
 
@@ -450,7 +628,7 @@ class ACEMethod(BaseMethod):
         # Online ACE evaluation: solve each new stage using the playbook
         # accumulated before seeing this stage. The running attempt-1 curve is
         # therefore the average pass rate over the first K online stages.
-        actions1, feedback1, reward1 = self._run_attempt(
+        actions1, feedback1, reward1, generator_trace1 = self._run_attempt(
             lambda obs: build_attempt2_prompt_with_playbook(obs, self.playbook)
         )
 
@@ -461,17 +639,31 @@ class ACEMethod(BaseMethod):
         print(f"[Attempt 1] Feedback: {feedback1}")
         print(f"[Attempt 1] Reward:   {reward1}")
 
-        delta_items = run_reflector(
+        reflection = run_reflector(
             self.client, self.model,
             initial_obs, actions1, feedback1, reward1,
+            _format_generator_trace(generator_trace1),
             self.playbook, self.reflector_instruction,
             disable_thinking=self.disable_thinking,
         )
-        print(f"[Reflector] Proposed {len(delta_items)} delta items")
+        print("[Reflector] Structured reflection captured")
+
+        feedback_stats = _apply_playbook_feedback(
+            self.playbook, reflection, generator_trace1,
+            reward1, self.reward_threshold,
+        )
+        if any(feedback_stats[k] for k in ("helpful", "harmful", "neutral")):
+            source = "fallback" if feedback_stats["fallback"] else "reflector"
+            print(
+                f"[Playbook] feedback ({source}): "
+                f"+{feedback_stats['helpful']} helpful / "
+                f"+{feedback_stats['harmful']} harmful / "
+                f"{feedback_stats['neutral']} neutral"
+            )
 
         approved_deltas = run_curator(
             self.client, self.model,
-            delta_items, self.playbook, self.curator_instruction,
+            reflection, self.playbook, self.curator_instruction,
             disable_thinking=self.disable_thinking,
         )
         print(f"[Curator] Approved {len(approved_deltas)} delta items")
@@ -485,11 +677,12 @@ class ACEMethod(BaseMethod):
         if reward1 >= self.reward_threshold:
             print("[Gated] Attempt 1 succeeded. Skipping retry.")
             actions2, feedback2, reward2 = actions1, feedback1, reward1
+            generator_trace2 = generator_trace1
             gated = True
         else:
             gated = False
             self.env.reset()
-            actions2, feedback2, reward2 = self._run_attempt(
+            actions2, feedback2, reward2, generator_trace2 = self._run_attempt(
                 lambda obs: build_attempt2_prompt_with_playbook(obs, self.playbook)
             )
 
@@ -502,11 +695,15 @@ class ACEMethod(BaseMethod):
             "actions1": actions1,
             "feedback1": feedback1,
             "reward1": reward1,
+            "generator_trace1": generator_trace1,
+            "reflection": reflection,
+            "playbook_feedback": feedback_stats,
             "delta_items": [asdict(d) for d in approved_deltas],
             "playbook": self.playbook.to_dict(),
             "actions2": actions2,
             "feedback2": feedback2,
             "reward2": reward2,
+            "generator_trace2": generator_trace2,
             "playbook_size": len(self.playbook.items),
             "gated": gated,
         }
