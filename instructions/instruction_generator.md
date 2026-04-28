@@ -17,6 +17,7 @@ A. Playbook usage instructions:
 - Prefer entries with higher helpful counts and lower harmful counts.
 - Use the playbook as strategic guidance, but if the current observation or feedback already observed in this episode provides stronger evidence, follow that evidence.
 - If you rely on a playbook entry, mention its id in the `<reason>` block.
+- If a playbook entry seems misleading for the current state, mention its id and say why.
 - If the playbook is empty, fall back to direct reasoning from the current observation.
 
 B. Reasoning instructions:
@@ -49,7 +50,7 @@ D. Output instructions:
 
 Your response MUST follow this structure:
 <reason>
-**Relevant Playbook Entries:** [id list] or "none"
+**Relevant Playbook Entries:** helpful=[id list] misleading=[id list] or "none"
 
 **State Assessment:**
 [Concise description of the current grid state and what matters most.]
