@@ -41,7 +41,13 @@ def _print_table(logs: list) -> None:
     print(divider("└", "┴", "┘"))
 
 
-def run_experiment(env_name: str, n_episodes: int, model: str, server: str) -> None:
+def run_experiment(
+    env_name: str,
+    n_episodes: int,
+    model: str,
+    server: str,
+    disable_thinking: bool = False,
+) -> None:
     if env_name == "frozen_lake":
         env = FrozenLake()
     elif env_name == "sokoban":
@@ -49,7 +55,12 @@ def run_experiment(env_name: str, n_episodes: int, model: str, server: str) -> N
     else:
         raise ValueError(f"Unknown environment: {env_name!r}")
 
-    pipeline = ACENotebookPipeline(env, model=model, server_url=server)
+    pipeline = ACENotebookPipeline(
+        env,
+        model=model,
+        server_url=server,
+        disable_thinking=disable_thinking,
+    )
     results = pipeline.run(n_episodes=n_episodes)
 
     _print_table(results["logs"])
@@ -93,11 +104,23 @@ def main() -> None:
             "(e.g. SGLang); must expose /v1/chat/completions."
         ),
     )
+    parser.add_argument(
+        "--disable-thinking",
+        action="store_true",
+        default=False,
+        help="Disable thinking mode for Qwen3/Qwen3.5 models (default: thinking enabled)",
+    )
     args = parser.parse_args()
 
     envs = ["frozen_lake", "sokoban"] if args.env == "both" else [args.env]
     for env_name in envs:
-        run_experiment(env_name, args.episodes, args.model, args.server)
+        run_experiment(
+            env_name,
+            args.episodes,
+            args.model,
+            args.server,
+            disable_thinking=args.disable_thinking,
+        )
 
 
 if __name__ == "__main__":

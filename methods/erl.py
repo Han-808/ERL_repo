@@ -38,11 +38,13 @@ class ERLMethod(BaseMethod):
         server_url: str = "http://LOCAL_SERVER/v1",
         reward_threshold: float = 1.0,   # τ = 1 as specified in Appendix A
         memory_size: int = 5,
+        disable_thinking: bool = False,
     ):
         self.env = env
         self.model = model
         self.reward_threshold = reward_threshold
         self.memory_size = memory_size
+        self.disable_thinking = disable_thinking
         self.memory = self.initialize_context()
         self.episode_logs = []
 
@@ -71,7 +73,10 @@ class ERLMethod(BaseMethod):
 
         while not self.env.done:
             obs = self.env.get_observation()
-            lm_out = call_lm(self.client, self.model, build_step_prompt(obs))
+            lm_out = call_lm(
+                self.client, self.model, build_step_prompt(obs),
+                disable_thinking=self.disable_thinking,
+            )
             action = parse_action_single(lm_out)
             all_actions.append(action)
             _, step_feedback, reward, done = self.env.step([action])
@@ -105,7 +110,10 @@ class ERLMethod(BaseMethod):
             prompt_r = build_reflection_prompt(
                 initial_obs, actions1, feedback1, reward1, self.memory
             )
-            reflection = call_lm(self.client, self.model, prompt_r)
+            reflection = call_lm(
+                self.client, self.model, prompt_r,
+                disable_thinking=self.disable_thinking,
+            )
             print(f"\n[Reflection] {reflection}")
 
             self.env.reset()
