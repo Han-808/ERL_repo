@@ -9,7 +9,7 @@ ACE Method ready.
 [Attempt 1] Feedback: Step 1: moved Right, now on D (frozen tile). Step 2: moved Down, now on D (frozen tile). Step 3: moved Down, now on D (frozen tile). Step 4: moved Right, now on D (frozen tile). Step 5: moved Right, now on D (frozen tile). Step 6: moved Left, now on D (frozen tile). Step 7: moved Right, now on D (frozen tile). Step 8: moved Down, reached B (goal)!
 [Attempt 1] Reward:   1
 
-[Reflector raw]
+[Reflector raw] 
 [ADD] Avoid moving into frozen tiles when a clear path exists to the goal
 reason: The generator repeatedly moved into frozen tiles without exploring alternative paths, leading to unnecessary detours and wasted steps. A clear path to the goal was available but not utilized.
 [Reflector] Proposed 1 delta items

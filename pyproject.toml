@@ -1,0 +1,9 @@
+[project]
+name = "erl-repo"
+version = "0.1.0"
+description = "ACE and ERL grid-world experiments for FrozenLake and Sokoban."
+requires-python = ">=3.12"
+dependencies = [
+    "jinja2>=3.1.0",
+    "openai>=1.0.0",
+]
