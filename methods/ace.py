@@ -54,9 +54,9 @@ class PlaybookItem:
 @dataclass
 class DeltaItem:
     """A proposed change to the playbook emitted by the Curator."""
-    operation: str            # "ADD" | "MODIFY" | "DELETE"
-    id: int                   # target bullet id; -1 for ADD
-    content: str              # new text; "" for DELETE
+    operation: str            # "ADD"; original ACE curator is ADD-only
+    id: int                   # -1 for ADD
+    content: str              # new bullet text
     reason: str = ""          # explanation (for logging, not applied)
 
 
@@ -70,7 +70,7 @@ class Playbook:
 
     The playbook is the evolving context described in the paper: the
     Generator reads it, the Reflector diagnoses trajectories, the
-    Curator proposes deltas, and apply_delta merges them deterministically.
+    Curator proposes ADD-only deltas, and apply_delta merges them deterministically.
     """
 
     def __init__(self):
@@ -83,14 +83,8 @@ class Playbook:
         self._next_id += 1
         return item
 
-    def modify(self, item_id: int, new_content: str) -> bool:
-        for it in self.items:
-            if it.id == item_id:
-                it.content = new_content.strip()
-                return True
-        return False
-
-    def delete(self, item_id: int) -> bool:
+    def _remove_item(self, item_id: int) -> bool:
+        """Remove an item during deterministic duplicate pruning."""
         for i, it in enumerate(self.items):
             if it.id == item_id:
                 self.items.pop(i)
@@ -110,8 +104,8 @@ class Playbook:
                 return
 
     def apply_delta(self, deltas: list):
-        """Apply a list of DeltaItems in order and print a short summary."""
-        added = modified = deleted = skipped = 0
+        """Apply ADD-only Curator output in order and print a short summary."""
+        added = skipped = 0
         for d in deltas:
             op = d.operation.upper()
             if op == "ADD":
@@ -120,24 +114,10 @@ class Playbook:
                     added += 1
                 else:
                     skipped += 1
-            elif op == "MODIFY":
-                if self.modify(d.id, d.content):
-                    modified += 1
-                else:
-                    skipped += 1
-            elif op == "DELETE":
-                if self.delete(d.id):
-                    deleted += 1
-                else:
-                    skipped += 1
             else:
                 skipped += 1
 
-        print(
-            f"[Playbook] apply_delta: +{added} add / "
-            f"~{modified} modify / -{deleted} delete "
-            f"({skipped} skipped)"
-        )
+        print(f"[Playbook] apply_delta: +{added} add ({skipped} skipped)")
 
     def to_prompt_string(self) -> str:
         if not self.items:
@@ -166,8 +146,7 @@ class Playbook:
 # Delta-item parser
 # ----------------------------------------------------------------------
 
-_OP_RE = re.compile(r"^\s*\[(ADD|MODIFY|DELETE)\]\s*(.*)$", re.IGNORECASE)
-_ID_RE = re.compile(r"id\s*=\s*(\d+)", re.IGNORECASE)
+_OP_RE = re.compile(r"^\s*\[ADD\]\s*(.*)$", re.IGNORECASE)
 _REASON_RE = re.compile(r"^\s*reason\s*:\s*(.*)$", re.IGNORECASE)
 _JSON_FENCE_RE = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL)
 _PLAYBOOK_LINE_RE = re.compile(r"playbook|relevant entries|entry ids?", re.IGNORECASE)
@@ -177,15 +156,12 @@ def _parse_delta_items(text: str) -> list:
     """
     Parse the LM's delta output into a list of DeltaItem.
 
-    Accepted shapes (case-insensitive):
-      [ADD] <content>
-      reason: <text>
+    The original ACE curator is ADD-only. The preferred format is JSON:
 
-      [MODIFY] id=3 <content>
-      reason: <text>
+      {"reasoning": "...", "operations": [{"type": "ADD", "content": "..."}]}
 
-      [DELETE] id=3
-      reason: <text>
+    A legacy [ADD] fallback is accepted for robustness, but MODIFY/DELETE
+    are intentionally ignored.
 
     Returns an empty list for [NO_CHANGE] or when no items are found.
     Never raises.
@@ -194,6 +170,25 @@ def _parse_delta_items(text: str) -> list:
         return []
     if "[NO_CHANGE]" in text.upper():
         return []
+
+    payload = _extract_json_payload(text)
+    operations = payload.get("operations", []) if isinstance(payload, dict) else []
+    if isinstance(operations, list):
+        json_deltas = []
+        for op in operations:
+            if not isinstance(op, dict):
+                continue
+            if str(op.get("type", "")).strip().upper() != "ADD":
+                continue
+            content = str(op.get("content", "")).strip()
+            if not content:
+                continue
+            reason = str(op.get("reason", "")).strip()
+            json_deltas.append(
+                DeltaItem(operation="ADD", id=-1, content=content, reason=reason)
+            )
+        if json_deltas:
+            return json_deltas
 
     deltas = []
     current = None
@@ -204,24 +199,8 @@ def _parse_delta_items(text: str) -> list:
         if m:
             if current is not None:
                 deltas.append(current)
-            op = m.group(1).upper()
-            rest = m.group(2).strip()
-
-            target_id = -1
-            content = ""
-
-            if op in ("MODIFY", "DELETE"):
-                id_match = _ID_RE.search(rest)
-                if id_match:
-                    target_id = int(id_match.group(1))
-                    content = _ID_RE.sub("", rest, count=1).strip()
-                else:
-                    current = None
-                    continue
-            else:  # ADD
-                content = rest
-
-            current = DeltaItem(operation=op, id=target_id, content=content, reason="")
+            content = m.group(1).strip()
+            current = DeltaItem(operation="ADD", id=-1, content=content, reason="")
             continue
 
         rm = _REASON_RE.match(line)
@@ -231,7 +210,6 @@ def _parse_delta_items(text: str) -> list:
 
         if (
             current is not None
-            and current.operation in ("ADD", "MODIFY")
             and not current.content
             and line.strip()
         ):
@@ -242,11 +220,7 @@ def _parse_delta_items(text: str) -> list:
 
     cleaned = []
     for d in deltas:
-        if d.operation == "DELETE" and d.id >= 0:
-            cleaned.append(d)
-        elif d.operation in ("ADD", "MODIFY") and d.content:
-            if d.operation == "MODIFY" and d.id < 0:
-                continue
+        if d.operation == "ADD" and d.content:
             cleaned.append(d)
     return cleaned
 
@@ -255,9 +229,9 @@ def _extract_json_payload(raw: str) -> dict:
     """
     Extract a JSON object from an LM response.
 
-    The Reflector prompt asks for a fenced JSON block, but local models may
-    add small wrappers. This keeps the pipeline robust without letting the
-    Reflector emit playbook deltas directly.
+    The Reflector and Curator prompts ask for JSON, but local models may add
+    small wrappers. This keeps parsing robust while preserving the intended
+    division of labor between Reflector diagnosis and Curator ADDs.
     """
     if not raw:
         return {}
@@ -527,7 +501,7 @@ def grow_and_refine(playbook: Playbook, similarity_threshold: float = 0.85):
 
             if ratio > similarity_threshold:
                 if b.helpful_count > a.helpful_count:
-                    playbook.delete(a.id)
+                    playbook._remove_item(a.id)
                     merged += 1
                     a = playbook.items[i] if i < len(playbook.items) else None
                     if a is None:
@@ -535,7 +509,7 @@ def grow_and_refine(playbook: Playbook, similarity_threshold: float = 0.85):
                     j = i + 1
                     continue
                 else:
-                    playbook.delete(b.id)
+                    playbook._remove_item(b.id)
                     merged += 1
                     continue
             j += 1

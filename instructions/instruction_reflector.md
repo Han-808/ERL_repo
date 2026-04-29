@@ -37,12 +37,12 @@ C. Reflection quality rules:
 
 - The key insight should be durable and actionable, not a one-off narration of this episode.
 - If the episode succeeded and no clear reusable lesson was learned, say that no playbook change is needed.
-- If a lesson overlaps with an existing playbook item, say which id should be revised rather than implying a new item is needed.
+- If a lesson overlaps with an existing playbook item, identify the existing id so the Curator can avoid adding a redundant new item.
 
 D. Output rules:
 
 - Return ONLY valid JSON in a single ```json block.
-- Do NOT include [ADD], [MODIFY], [DELETE], or [NO_CHANGE]. Those operations belong to the Curator.
+- Do NOT include playbook operations such as [ADD], [MODIFY], [DELETE], or [NO_CHANGE]. The Curator handles ADD-only playbook updates.
 - The JSON object must contain exactly these fields:
 
 ```json
