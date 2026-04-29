@@ -76,7 +76,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run an experiment.")
     parser.add_argument(
         "--method", required=True, choices=sorted(METHODS),
-        help="Method to run (erl or ace).",
+        help="Method to run.",
     )
     parser.add_argument(
         "--env", choices=["frozen_lake", "sokoban", "both"], default="both",

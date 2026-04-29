@@ -15,9 +15,18 @@ from common import load_results, results_path
 
 def parse_result_file(path: Path) -> dict:
     name = path.stem  # results_<method>_<env>
-    parts = name.split("_", 2)
-    method = parts[1] if len(parts) > 1 else "?"
-    env = parts[2] if len(parts) > 2 else "?"
+    body = name.removeprefix("results_")
+    env_suffixes = ("_frozen_lake", "_sokoban")
+    method, env = "?", "?"
+    for suffix in env_suffixes:
+        if body.endswith(suffix):
+            method = body[:-len(suffix)]
+            env = suffix[1:]
+            break
+    else:
+        method, _, env = body.rpartition("_")
+        method = method or "?"
+        env = env or "?"
     data = load_results(path)
     return {
         "method": method,
