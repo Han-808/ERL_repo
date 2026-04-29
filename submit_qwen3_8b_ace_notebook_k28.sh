@@ -74,7 +74,7 @@ sbatch \
       --disable-cuda-graph \
       --attention-backend triton \
       --sampling-backend pytorch \
-      > \"\$RUN_DIR/sglang_server.log\" 2>&1 &
+      > /dev/null 2>&1 &
 
     SERVER_PID=\$!
 
@@ -94,7 +94,6 @@ sbatch \
 
     if ! curl --noproxy \"*\" -s http://127.0.0.1:30000/v1/models >/dev/null 2>&1; then
       echo \"ERROR: SGLang server failed to start\"
-      tail -100 \"\$RUN_DIR/sglang_server.log\" || true
       exit 1
     fi
 

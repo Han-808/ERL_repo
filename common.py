@@ -8,7 +8,9 @@ run_experiment driver used by run.py.
 """
 
 import json
+import os
 import re
+import time
 from pathlib import Path
 
 from openai import OpenAI
@@ -50,6 +52,59 @@ def build_client(server_url: str) -> OpenAI:
     return OpenAI(base_url=server_url, api_key="EMPTY")
 
 
+def _safe_model_dump(obj):
+    """Best-effort conversion of OpenAI SDK objects into JSON data."""
+    if obj is None:
+        return None
+    if hasattr(obj, "model_dump"):
+        return obj.model_dump(mode="json")
+    if hasattr(obj, "dict"):
+        return obj.dict()
+    if isinstance(obj, (dict, list, str, int, float, bool)):
+        return obj
+    return str(obj)
+
+
+def _extract_reasoning_contents(response) -> list:
+    """Collect reasoning fields exposed by SGLang/OpenAI-compatible responses."""
+    reasoning = []
+    for choice in getattr(response, "choices", []) or []:
+        message = getattr(choice, "message", None)
+        if message is None:
+            continue
+        for key in ("reasoning_content", "reasoning_contents"):
+            value = getattr(message, key, None)
+            if value:
+                if isinstance(value, list):
+                    reasoning.extend(value)
+                else:
+                    reasoning.append(value)
+        extra = getattr(message, "model_extra", None) or {}
+        if isinstance(extra, dict):
+            for key in ("reasoning_content", "reasoning_contents"):
+                value = extra.get(key)
+                if value:
+                    if isinstance(value, list):
+                        reasoning.extend(value)
+                    else:
+                        reasoning.append(value)
+    return reasoning
+
+
+def _append_lm_trace(payload: dict) -> None:
+    """Append one chat-completion trace to LLM_TRACE_PATH, if configured."""
+    trace_path = os.environ.get("LLM_TRACE_PATH")
+    if not trace_path:
+        return
+    try:
+        path = Path(trace_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    except Exception as exc:
+        print(f"[LM trace warning] could not write trace: {exc}")
+
+
 def call_lm(client, model: str, prompt: str,
             disable_thinking: bool = False) -> str:
     """
@@ -60,21 +115,54 @@ def call_lm(client, model: str, prompt: str,
     sends enable_thinking=False through SGLang's OpenAI-compatible API.
     Returns "" on failure.
     """
-    try:
-        request_kwargs = {
-            "model": model,
-            "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 512,
-            "temperature": 0.7,
+    messages = [{"role": "user", "content": prompt}]
+    request_kwargs = {
+        "model": model,
+        "messages": messages,
+        "max_tokens": 512,
+        "temperature": 0.7,
+    }
+    if disable_thinking:
+        request_kwargs["extra_body"] = {
+            "chat_template_kwargs": {"enable_thinking": False},
         }
-        if disable_thinking:
-            request_kwargs["extra_body"] = {
-                "chat_template_kwargs": {"enable_thinking": False},
-            }
+
+    try:
         response = client.chat.completions.create(**request_kwargs)
-        return response.choices[0].message.content
+        message = response.choices[0].message
+        content = message.content or ""
+        reasoning_contents = _extract_reasoning_contents(response)
+        _append_lm_trace({
+            "timestamp": int(time.time()),
+            "model": model,
+            "disable_thinking": disable_thinking,
+            "prompt": prompt,
+            "messages": messages,
+            "request": request_kwargs,
+            "response": _safe_model_dump(response),
+            "content": content,
+            "reasoning_content": (
+                reasoning_contents[0] if reasoning_contents else None
+            ),
+            "reasoning_contents": reasoning_contents,
+            "error": None,
+        })
+        return content
     except Exception as e:
         print(f"[LM error] {e}")
+        _append_lm_trace({
+            "timestamp": int(time.time()),
+            "model": model,
+            "disable_thinking": disable_thinking,
+            "prompt": prompt,
+            "messages": [{"role": "user", "content": prompt}],
+            "request": request_kwargs,
+            "response": None,
+            "content": "",
+            "reasoning_content": None,
+            "reasoning_contents": [],
+            "error": str(e),
+        })
         return ""
 
 

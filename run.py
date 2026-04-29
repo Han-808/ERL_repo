@@ -11,6 +11,7 @@ Usage examples:
 """
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -53,6 +54,12 @@ ENVS = {
 
 
 def run_experiment(method_name: str, env_name: str, args) -> None:
+    outputs_dir = Path(args.outputs_dir)
+    os.environ["LLM_TRACE_PATH"] = str(
+        outputs_dir / f"llm_calls_{method_name}_{env_name}.jsonl"
+    )
+    print(f"LM traces will be saved to {os.environ['LLM_TRACE_PATH']}")
+
     method_cls, size_field, size_header = METHODS[method_name]
     env = ENVS[env_name]()
     method = method_cls(
