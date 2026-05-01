@@ -7,10 +7,10 @@ SGLANG=/mmfs1/gscratch/stf/mohanc3/.conda/envs/sglang311/bin/sglang
 
 MODEL=Qwen/Qwen3-8B
 MODEL_TAG=qwen3-8b
-EPISODES=28
+EPISODES=40
 ENV_NAME=both
 METHODS=(ace notebook_minimal)
-JOB_NAME="qwen3-8b-ace-notebook-empty-k28-both"
+JOB_NAME="qwen3-8b-ace-notebook-empty-k40-both"
 
 mkdir -p "${REPO_DIR}/logs" "${REPO_DIR}/runs"
 
@@ -43,12 +43,12 @@ fi
 
 sbatch \
   --job-name="${JOB_NAME}" \
-  --account=stf \
-  --partition=gpu-l40s \
+  --account=h2lab \
+  --partition=gpu-a100 \
   --nodes=1 \
   --ntasks=1 \
   --cpus-per-task=8 \
-  --gpus=l40s:1 \
+  --gpus=a100:1 \
   --mem=64G \
   --time=6:00:00 \
   --output="${REPO_DIR}/logs/%x-%j.out" \
