@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_DIR=/gscratch/stf/mohanc3/projects/ERL_repo
+REPO_DIR=/gscratch/h2lab/mohanc3/projects/ERL_repo
 UV=/gscratch/stf/mohanc3/uv-env/uv-bin/uv
 SGLANG=/mmfs1/gscratch/stf/mohanc3/.conda/envs/sglang311/bin/sglang
 
@@ -63,6 +63,17 @@ sbatch \
     export NO_PROXY=localhost,127.0.0.1
     export no_proxy=localhost,127.0.0.1
 
+    if [ -f /etc/profile.d/modules.sh ]; then
+      . /etc/profile.d/modules.sh
+    elif [ -f /sw/lmod/lmod/init/bash ]; then
+      . /sw/lmod/lmod/init/bash
+    fi
+
+    if ! command -v module >/dev/null 2>&1; then
+      echo \"ERROR: module command is unavailable after initialization\"
+      exit 1
+    fi
+
     module load cuda/12.4.1
     module load gcc/13.2.0
 
@@ -74,20 +85,20 @@ sbatch \
     export CXX=\$(which g++)
     export CUDAHOSTCXX=\$(which g++)
 
-    export HF_HOME=/gscratch/stf/mohanc3/hf-cache
-    export TRANSFORMERS_CACHE=/gscratch/stf/mohanc3/hf-cache
-    export HF_DATASETS_CACHE=/gscratch/stf/mohanc3/hf-cache
-    export WANDB_DIR=/gscratch/stf/mohanc3/wandb
-    export XDG_CACHE_HOME=/gscratch/stf/mohanc3/xdg-cache
-    export TORCH_EXTENSIONS_DIR=/gscratch/stf/mohanc3/torch-extensions
-    export TVM_FFI_CACHE_DIR=/gscratch/stf/mohanc3/tvm-ffi-cache
+    export HF_HOME=/gscratch/h2lab/mohanc3/hf-cache
+    export TRANSFORMERS_CACHE=/gscratch/h2lab/mohanc3/hf-cache
+    export HF_DATASETS_CACHE=/gscratch/h2lab/mohanc3/hf-cache
+    export WANDB_DIR=/gscratch/h2lab/mohanc3/wandb
+    export XDG_CACHE_HOME=/gscratch/h2lab/mohanc3/xdg-cache
+    export TORCH_EXTENSIONS_DIR=/gscratch/h2lab/mohanc3/torch-extensions
+    export TVM_FFI_CACHE_DIR=/gscratch/h2lab/mohanc3/tvm-ffi-cache
     export PYTHONUNBUFFERED=1
 
-    mkdir -p /gscratch/stf/mohanc3/hf-cache
-    mkdir -p /gscratch/stf/mohanc3/wandb
-    mkdir -p /gscratch/stf/mohanc3/xdg-cache
-    mkdir -p /gscratch/stf/mohanc3/torch-extensions
-    mkdir -p /gscratch/stf/mohanc3/tvm-ffi-cache
+    mkdir -p /gscratch/h2lab/mohanc3/hf-cache
+    mkdir -p /gscratch/h2lab/mohanc3/wandb
+    mkdir -p /gscratch/h2lab/mohanc3/xdg-cache
+    mkdir -p /gscratch/h2lab/mohanc3/torch-extensions
+    mkdir -p /gscratch/h2lab/mohanc3/tvm-ffi-cache
 
     export RUN_DIR=${REPO_DIR}/runs/\${SLURM_JOB_NAME}-\${SLURM_JOB_ID}
     mkdir -p \"\$RUN_DIR\" \"\$RUN_DIR/outputs\"
