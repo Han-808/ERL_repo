@@ -50,7 +50,7 @@ sbatch \
   --ntasks=1 \
   --cpus-per-task=8 \
   --gpus=a100:1 \
-  --mem=64G \
+  --mem=128G \
   --time=6:00:00 \
   --output="${REPO_DIR}/logs/%x-%j.out" \
   --error="${REPO_DIR}/logs/%x-%j.err" \
@@ -85,6 +85,7 @@ sbatch \
 
     export RUN_DIR=${REPO_DIR}/runs/\${SLURM_JOB_NAME}-\${SLURM_JOB_ID}
     mkdir -p \"\$RUN_DIR\" \"\$RUN_DIR/outputs\"
+    SGLANG_LOG=\"\$RUN_DIR/sglang_server.log\"
 
     echo \"Job: \$SLURM_JOB_NAME \$SLURM_JOB_ID\"
     echo \"Node: \$(hostname)\"
@@ -93,6 +94,7 @@ sbatch \
     echo \"Notebook variant: empty via notebook_minimal\"
     echo \"Env: ${ENV_NAME}\"
     echo \"Episodes: ${EPISODES}\"
+    echo \"SGLang log: \$SGLANG_LOG\"
     which nvcc
     nvcc --version
 
@@ -104,7 +106,7 @@ sbatch \
       --disable-cuda-graph \
       --attention-backend triton \
       --sampling-backend pytorch \
-      > /dev/null 2>&1 &
+      > \"\$SGLANG_LOG\" 2>&1 &
 
     SERVER_PID=\$!
 
@@ -115,6 +117,12 @@ sbatch \
 
     echo \"Waiting for SGLang server...\"
     for i in \$(seq 1 120); do
+      if ! kill -0 \$SERVER_PID 2>/dev/null; then
+        echo \"ERROR: SGLang server exited before becoming ready\"
+        echo \"Last 120 lines of \$SGLANG_LOG:\"
+        tail -n 120 \"\$SGLANG_LOG\" || true
+        exit 1
+      fi
       if curl --noproxy \"*\" -s http://127.0.0.1:30000/v1/models >/dev/null 2>&1; then
         echo \"Server ready after \$((i * 5)) seconds\"
         break
@@ -124,6 +132,8 @@ sbatch \
 
     if ! curl --noproxy \"*\" -s http://127.0.0.1:30000/v1/models >/dev/null 2>&1; then
       echo \"ERROR: SGLang server failed to start\"
+      echo \"Last 120 lines of \$SGLANG_LOG:\"
+      tail -n 120 \"\$SGLANG_LOG\" || true
       exit 1
     fi
 
