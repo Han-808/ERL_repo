@@ -6,7 +6,7 @@ Self-Improving Language Models" — arXiv 2510.04618.
 
 Consolidates the Playbook bullet structure, Reflector diagnosis,
 Curator delta updates, the grow-and-refine de-duplication pass, and the
-two-attempt episode loop into a single module — mirroring the way
+single-attempt episode loop into a single module — mirroring the way
 methods/ace.py is organized in the appworld-context-updater template.
 
 Sections referenced below:
@@ -266,8 +266,38 @@ def _empty_reflection(raw: str = "") -> dict:
         "root_cause_analysis": "",
         "correct_approach": "",
         "key_insight": "no new playbook insight",
+        "bullet_tags": [],
         "playbook_feedback": [],
     }
+
+
+def _normalize_bullet_tags(payload: dict) -> list:
+    tags = payload.get("bullet_tags", [])
+    if not isinstance(tags, list):
+        tags = []
+
+    if not tags:
+        feedback = payload.get("playbook_feedback", [])
+        if isinstance(feedback, list):
+            tags = [
+                {
+                    "id": item.get("id", item.get("bullet_id")),
+                    "tag": item.get("tag", item.get("label")),
+                }
+                for item in feedback
+                if isinstance(item, dict)
+            ]
+
+    cleaned = []
+    for item in tags:
+        if not isinstance(item, dict):
+            continue
+        item_id = item.get("id", item.get("bullet_id"))
+        tag = str(item.get("tag", item.get("label", ""))).strip().lower()
+        if item_id is None or tag not in {"helpful", "harmful", "neutral"}:
+            continue
+        cleaned.append({"id": item_id, "tag": tag})
+    return cleaned
 
 
 def _normalize_reflection(raw: str) -> dict:
@@ -288,8 +318,12 @@ def _normalize_reflection(raw: str) -> dict:
         value = payload.get(key, "")
         reflection[key] = str(value).strip()
 
-    feedback = payload.get("playbook_feedback", [])
-    reflection["playbook_feedback"] = feedback if isinstance(feedback, list) else []
+    bullet_tags = _normalize_bullet_tags(payload)
+    reflection["bullet_tags"] = bullet_tags
+    reflection["playbook_feedback"] = [
+        {"id": item["id"], "label": item["tag"], "reason": ""}
+        for item in bullet_tags
+    ]
     return reflection
 
 
@@ -327,6 +361,18 @@ def _format_generator_trace(step_traces: list) -> str:
     return "\n\n---\n\n".join(chunks)
 
 
+def _format_playbook_stats(playbook: Playbook) -> str:
+    if not playbook.items:
+        return "items: 0\nhelpful tags: 0\nharmful tags: 0"
+    helpful = sum(it.helpful_count for it in playbook.items)
+    harmful = sum(it.harmful_count for it in playbook.items)
+    return (
+        f"items: {len(playbook.items)}\n"
+        f"helpful tags: {helpful}\n"
+        f"harmful tags: {harmful}"
+    )
+
+
 def _apply_playbook_feedback(
     playbook: Playbook,
     reflection: dict,
@@ -348,17 +394,19 @@ def _apply_playbook_feedback(
 
     seen = set()
     feedback = reflection.get("playbook_feedback", [])
+    if not isinstance(feedback, list) or not feedback:
+        feedback = reflection.get("bullet_tags", [])
     if isinstance(feedback, list):
         for item in feedback:
             if not isinstance(item, dict):
                 continue
             try:
-                item_id = int(item.get("id"))
+                item_id = int(item.get("id", item.get("bullet_id")))
             except (TypeError, ValueError):
                 continue
             if item_id not in valid_ids or item_id in seen:
                 continue
-            label = str(item.get("label", "")).strip().lower()
+            label = str(item.get("label", item.get("tag", ""))).strip().lower()
             seen.add(item_id)
             if label == "helpful":
                 playbook.mark_helpful(item_id)
@@ -401,8 +449,8 @@ def _load_instruction(instruction_path: str) -> str:
 _GENERATOR_TEMPLATE = _load_instruction(_INSTRUCTIONS_DIR / "instruction_generator.md")
 
 
-def build_attempt2_prompt_with_playbook(observation: str, playbook: Playbook) -> str:
-    """Per-step Generator prompt for attempt 2, with the full Playbook injected."""
+def build_generator_prompt_with_playbook(observation: str, playbook: Playbook) -> str:
+    """Per-step Generator prompt with the full Playbook injected."""
     return render_template(
         _GENERATOR_TEMPLATE,
         playbook=playbook.to_prompt_string(),
@@ -454,6 +502,9 @@ def run_curator(
     reflection: dict,
     playbook: Playbook,
     instruction_path: str,
+    current_step: int | str = "not provided",
+    total_samples: int | str = "not provided",
+    token_budget: int | str = "not provided",
     disable_thinking: bool = False,
 ) -> list:
     """Turn the Reflector's diagnosis into approved playbook deltas."""
@@ -464,6 +515,17 @@ def run_curator(
         template,
         playbook=playbook.to_prompt_string(),
         reflection=json.dumps(reflection, indent=2),
+        current_playbook=playbook.to_prompt_string(),
+        recent_reflection=json.dumps(reflection, indent=2),
+        playbook_stats=_format_playbook_stats(playbook),
+        question_context=(
+            "Deterministic grid-navigation task. The Generator sees the "
+            "current observation, predicts one action per step, and the "
+            "environment returns feedback plus reward for the trajectory."
+        ),
+        current_step=current_step,
+        total_samples=total_samples,
+        token_budget=token_budget,
     )
     raw = call_lm(
         lm_client, model, prompt, disable_thinking=disable_thinking
@@ -549,6 +611,7 @@ class ACEMethod(BaseMethod):
         self.disable_thinking = disable_thinking
         self.playbook = self.initialize_context()
         self.episode_logs = []
+        self.total_episodes = "not provided"
 
         self.client = build_client(server_url)
 
@@ -603,7 +666,7 @@ class ACEMethod(BaseMethod):
         # accumulated before seeing this stage. The running attempt-1 curve is
         # therefore the average pass rate over the first K online stages.
         actions1, feedback1, reward1, generator_trace1 = self._run_attempt(
-            lambda obs: build_attempt2_prompt_with_playbook(obs, self.playbook)
+            lambda obs: build_generator_prompt_with_playbook(obs, self.playbook)
         )
 
         print(f"\n{'='*40}")
@@ -638,6 +701,8 @@ class ACEMethod(BaseMethod):
         approved_deltas = run_curator(
             self.client, self.model,
             reflection, self.playbook, self.curator_instruction,
+            current_step=episode_num,
+            total_samples=self.total_episodes,
             disable_thinking=self.disable_thinking,
         )
         print(f"[Curator] Approved {len(approved_deltas)} delta items")
@@ -647,22 +712,6 @@ class ACEMethod(BaseMethod):
 
         if self.refine_every > 0 and episode_num % self.refine_every == 0:
             grow_and_refine(self.playbook)
-
-        if reward1 >= self.reward_threshold:
-            print("[Gated] Attempt 1 succeeded. Skipping retry.")
-            actions2, feedback2, reward2 = actions1, feedback1, reward1
-            generator_trace2 = generator_trace1
-            gated = True
-        else:
-            gated = False
-            self.env.reset()
-            actions2, feedback2, reward2, generator_trace2 = self._run_attempt(
-                lambda obs: build_attempt2_prompt_with_playbook(obs, self.playbook)
-            )
-
-            print(f"\n[Attempt 2] Actions:  {actions2}")
-            print(f"[Attempt 2] Feedback: {feedback2}")
-            print(f"[Attempt 2] Reward:   {reward2}")
 
         return {
             "episode": episode_num,
@@ -674,17 +723,13 @@ class ACEMethod(BaseMethod):
             "playbook_feedback": feedback_stats,
             "delta_items": [asdict(d) for d in approved_deltas],
             "playbook": self.playbook.to_dict(),
-            "actions2": actions2,
-            "feedback2": feedback2,
-            "reward2": reward2,
-            "generator_trace2": generator_trace2,
             "playbook_size": len(self.playbook.items),
-            "gated": gated,
         }
 
     # -- Full experiment ----------------------------------------------------
 
     def run(self, n_episodes: int) -> dict:
+        self.total_episodes = n_episodes
         all_logs = []
         for ep in range(1, n_episodes + 1):
             all_logs.append(self.run_episode(ep))

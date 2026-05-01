@@ -1,10 +1,9 @@
 """
 Shared utilities for every method in this repo.
 
-Mirrors the role of appworld-context-updater/common.py in the
-template: defines the BaseMethod contract, the shared LM call, the
-action parser, the Jinja-style template renderer, and the
-run_experiment driver used by run.py.
+Defines the BaseMethod contract, the shared LM call, the action parser,
+the lightweight template renderer, result IO helpers, and experiment
+summary/table formatting.
 """
 
 import json
@@ -20,17 +19,16 @@ _VALID_ACTIONS = {"Up", "Down", "Left", "Right"}
 
 
 # ----------------------------------------------------------------------
-# BaseMethod — abstract contract for every method in run.py's registry
+# BaseMethod contract
 # ----------------------------------------------------------------------
 
 class BaseMethod:
     """
     Abstract base class for an ACE-style method.
 
-    Mirrors the BaseModel contract from the appworld-context-updater
-    template: each concrete method exposes a stable `name`, builds its
-    initial context (memory / playbook / notebook / summary), and runs
-    a single episode returning a JSON-serializable log dict.
+    Each concrete method exposes a stable `name`, builds its initial context
+    (memory / playbook / notebook / summary), and runs a single episode
+    returning a JSON-serializable log dict.
     """
 
     name: str = "base"
@@ -110,9 +108,9 @@ def call_lm(client, model: str, prompt: str,
     """
     Send a prompt to the LM and return the response text.
 
-    Identical parameters across ERL and ACE (max_tokens=1024,
-    temperature=0.7).  For Qwen3-style chat templates, disable_thinking
-    sends enable_thinking=False through SGLang's OpenAI-compatible API.
+    Identical parameters across ERL and ACE (max_tokens=512,
+    temperature=0.7). For Qwen3-style chat templates, disable_thinking sends
+    enable_thinking=False through SGLang's OpenAI-compatible API.
     Returns "" on failure.
     """
     messages = [{"role": "user", "content": prompt}]
@@ -148,34 +146,34 @@ def call_lm(client, model: str, prompt: str,
             "error": None,
         })
         return content
-    except Exception as e:
-        print(f"[LM error] {e}")
+    except Exception as exc:
+        print(f"[LM error] {exc}")
         _append_lm_trace({
             "timestamp": int(time.time()),
             "model": model,
             "disable_thinking": disable_thinking,
             "prompt": prompt,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": messages,
             "request": request_kwargs,
             "response": None,
             "content": "",
             "reasoning_content": None,
             "reasoning_contents": [],
-            "error": str(e),
+            "error": str(exc),
         })
         return ""
 
 
 # ----------------------------------------------------------------------
-# Action parser — shared by every step-by-step method
+# Action parser
 # ----------------------------------------------------------------------
 
 def parse_action_single(lm_output: str) -> str:
     """
     Extract one action from the LM's output.
 
-    Primary format (paper Table 2): triple backticks, e.g. ```Down```
-    Fallback 1: any backtick-quoted token, e.g. `Down`
+    Primary format: triple backticks, e.g. ```Down```.
+    Fallback 1: any backtick-quoted token, e.g. `Down`.
     Fallback 2: first valid action word found scanning lines bottom-up.
     Fallback 3: "Down" if nothing matches.
     """
@@ -206,13 +204,9 @@ def parse_action_single(lm_output: str) -> str:
 
 def render_template(template: str, **kwargs) -> str:
     """
-    Substitute {{ var }} placeholders (Jinja-style, single-line, no logic)
-    with provided values.
+    Substitute {{ var }} placeholders with provided values.
 
-    Mirrors the placeholder convention in the ACE paper's Appendix-D
-    prompts: occurrences of `{{ name }}` and `{{name}}` are replaced
-    with str(value).  We avoid str.format because the prompt text and
-    runtime payloads (grid feedback, playbook entries) may contain
+    We avoid str.format because prompt text and runtime payloads may contain
     literal braces that would otherwise be misinterpreted.
     """
     out = template
@@ -224,9 +218,9 @@ def render_template(template: str, **kwargs) -> str:
 
 def format_delta_items(deltas) -> str:
     """
-    Format a list of DeltaItem objects as a human-readable block for
-    the Curator prompt.  Accepts any object with .operation/.id/
-    .content/.reason fields.
+    Format a list of DeltaItem objects as a human-readable block.
+
+    Accepts any object with .operation/.id/.content/.reason fields.
     """
     if not deltas:
         return "(none)"
@@ -246,7 +240,7 @@ def format_delta_items(deltas) -> str:
 
 
 # ----------------------------------------------------------------------
-# Results IO — stable filename scheme shared by every method
+# Results IO
 # ----------------------------------------------------------------------
 
 def results_path(outputs_dir: str, method_name: str, env_name: str) -> Path:
@@ -265,7 +259,7 @@ def load_results(path: Path) -> dict:
 
 
 # ----------------------------------------------------------------------
-# Shared log summarizer — computes final + running (per-K) pass rates
+# Shared log summarizer
 # ----------------------------------------------------------------------
 
 def summarize_logs(all_logs: list, reward_threshold: float,
@@ -273,83 +267,61 @@ def summarize_logs(all_logs: list, reward_threshold: float,
     """
     Build the results dict returned by every method's run().
 
-    Adds two running-average curves so callers can measure how the
-    first-attempt (zero-shot-with-memory) success rate evolves as the
-    online memory / playbook grows — i.e. the "average pass rate on
-    the first K stages" for K = 1..N.
+    Adds a running-average curve for the single online attempt.
     """
-    def cum_rate(field: str) -> list:
+    def cum_rate() -> list:
         hits = 0
         out = []
         for k, lg in enumerate(all_logs, start=1):
-            if lg[field] >= reward_threshold:
+            if lg["reward1"] >= reward_threshold:
                 hits += 1
             out.append(hits / k)
         return out
 
-    running_a1 = cum_rate("reward1")
-    running_a2 = cum_rate("reward2")
-    rate1 = running_a1[-1] if running_a1 else 0.0
-    rate2 = running_a2[-1] if running_a2 else 0.0
+    running_rate = cum_rate()
+    rate = running_rate[-1] if running_rate else 0.0
+    n_success = sum(1 for lg in all_logs if lg["reward1"] >= reward_threshold)
 
-    n1 = sum(1 for lg in all_logs if lg["reward1"] >= reward_threshold)
-    n2 = sum(1 for lg in all_logs if lg["reward2"] >= reward_threshold)
-
-    print(f"\n{'='*40}")
+    print(f"\n{'=' * 40}")
     print(f"SUMMARY ({env_name}, {n_episodes} episodes)")
-    print(f"{'='*40}")
-    print(f"Attempt 1 success rate: {n1}/{n_episodes} ({rate1*100:.1f}%)")
-    print(f"Attempt 2 success rate: {n2}/{n_episodes} ({rate2*100:.1f}%)")
-    print(f"Improvement:            {(rate2 - rate1)*100:+.1f}%")
+    print(f"{'=' * 40}")
+    print(f"Success rate: {n_success}/{n_episodes} ({rate * 100:.1f}%)")
 
-    # Online-learning waypoints (running attempt-1 rate over first K episodes)
     if n_episodes >= 4:
         for frac in (0.25, 0.5, 0.75, 1.0):
             k = max(1, int(round(frac * n_episodes)))
-            print(f"  running attempt-1 @ K={k:3d}: "
-                  f"{running_a1[k-1]*100:.1f}%")
+            print(f"  running @ K={k:3d}: {running_rate[k - 1] * 100:.1f}%")
 
     return {
         "logs": all_logs,
-        "attempt1_rate": rate1,
-        "attempt2_rate": rate2,
-        "improvement": rate2 - rate1,
-        "running_attempt1_rate": running_a1,
-        "running_attempt2_rate": running_a2,
+        "pass_rate": rate,
+        "attempt1_rate": rate,
+        "running_pass_rate": running_rate,
+        "running_attempt1_rate": running_rate,
     }
 
 
 # ----------------------------------------------------------------------
-# Episode-log pretty-printer (shared by ERL + ACE)
+# Episode-log pretty-printer
 # ----------------------------------------------------------------------
 
 def print_episode_table(logs: list, size_field: str = "memory_size",
                         size_header: str = "Memory Size") -> None:
     """Print a fixed-width per-episode statistics table from episode logs."""
-    W = {"ep": 7, "r1": 9, "r2": 9, "gated": 6, "sz": 14}
+    headers = ["Episode", "Reward", size_header]
+    rows = [
+        [lg["episode"], lg["reward1"], lg.get(size_field, "")]
+        for lg in logs
+    ]
+    widths = [
+        max(len(str(row[i])) for row in [headers] + rows)
+        for i in range(len(headers))
+    ]
 
-    def row(*cells, widths):
-        return "│" + "│".join(
-            f" {str(c).center(w)} " for c, w in zip(cells, widths.values())
-        ) + "│"
+    def row(cells):
+        return " | ".join(str(c).ljust(w) for c, w in zip(cells, widths))
 
-    def divider(left, mid, right, fill="─"):
-        segs = [fill * (w + 2) for w in W.values()]
-        return left + mid.join(segs) + right
-
-    header = row(
-        "Episode", "Reward 1", "Reward 2", "Gated", size_header, widths=W
-    )
-    print(divider("┌", "┬", "┐"))
-    print(header)
-    print(divider("├", "┼", "┤"))
-    for lg in logs:
-        print(row(
-            lg["episode"],
-            lg["reward1"],
-            lg["reward2"],
-            "Yes" if lg["gated"] else "No",
-            lg.get(size_field, ""),
-            widths=W,
-        ))
-    print(divider("└", "┴", "┘"))
+    print(row(headers))
+    print("-+-".join("-" * w for w in widths))
+    for cells in rows:
+        print(row(cells))

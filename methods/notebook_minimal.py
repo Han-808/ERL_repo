@@ -15,13 +15,8 @@ to the grid-game setting:
     Playbook as the online context.
 
 Ablation switches:
-  initial_notebook = "default"  -> scaffold with section headers + hints
   initial_notebook = "empty"    -> section headers only
-
-Two attempts are retained for schema compatibility with summarize_logs /
-evaluate.py / print_episode_table, but attempt 2 is a no-op clone of
-attempt 1 (this method makes exactly one attempt per episode; the
-improvement column will always be 0).
+  initial_notebook = "default"  -> scaffold with section headers + hints
 """
 
 import json
@@ -265,7 +260,7 @@ class NotebookMinimalMethod(BaseMethod):
         model: str = "qwen3-8b",
         server_url: str = "http://LOCAL_SERVER/v1",
         reward_threshold: float = 1.0,
-        initial_notebook: str = "default",
+        initial_notebook: str = "empty",
         disable_thinking: bool = False,
     ):
         self.env = env
@@ -276,7 +271,7 @@ class NotebookMinimalMethod(BaseMethod):
         self.notebook = self.initialize_context()
         self.client = build_client(server_url)
 
-        if initial_notebook != "default":
+        if initial_notebook != "empty":
             self.name = f"notebook_minimal_{initial_notebook}"
 
         print(f"Connected to LM server at {server_url}")
@@ -363,19 +358,13 @@ class NotebookMinimalMethod(BaseMethod):
             initial_obs, actions1, feedback1, reward1
         )
 
-        # Single-attempt method: mirror attempt 1 into attempt 2 so the
-        # shared summarize_logs / print_episode_table schema stays valid.
         return {
             "episode":       episode_num,
             "actions1":      actions1,
             "feedback1":     feedback1,
             "reward1":       reward1,
             "reflection":    reasoning,
-            "actions2":      actions1,
-            "feedback2":     feedback1,
-            "reward2":       reward1,
             "notebook_size": len(self.notebook.splitlines()),
-            "gated":         True,
         }
 
     # -- Run over N episodes --------------------------------------------

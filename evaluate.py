@@ -32,11 +32,10 @@ def parse_result_file(path: Path) -> dict:
         "method": method,
         "env": env,
         "episodes": len(data.get("logs", [])),
-        "attempt1_rate": data.get("attempt1_rate"),
-        "attempt2_rate": data.get("attempt2_rate"),
-        "improvement": data.get("improvement"),
-        "running_attempt1_rate": data.get("running_attempt1_rate", []),
-        "running_attempt2_rate": data.get("running_attempt2_rate", []),
+        "pass_rate": data.get("pass_rate", data.get("attempt1_rate")),
+        "running_pass_rate": data.get(
+            "running_pass_rate", data.get("running_attempt1_rate", [])
+        ),
     }
 
 
@@ -52,43 +51,34 @@ def print_summary_table(rows: list) -> None:
         print("(no results found)")
         return
 
-    W = {"method": 10, "env": 12, "eps": 5, "a1": 10, "a2": 10, "imp": 10}
-
     def fmt_rate(r):
-        return "-" if r is None else f"{r*100:.1f}%"
+        return "-" if r is None else f"{r * 100:.1f}%"
 
-    def fmt_imp(r):
-        return "-" if r is None else f"{r*100:+.1f}%"
+    headers = ["Method", "Env", "Eps", "Success"]
+    table = [
+        [r["method"], r["env"], r["episodes"], fmt_rate(r["pass_rate"])]
+        for r in rows
+    ]
+    widths = [
+        max(len(str(row[i])) for row in [headers] + table)
+        for i in range(len(headers))
+    ]
 
-    def line(left, mid, right, fill="─"):
-        return left + mid.join(fill * (w + 2) for w in W.values()) + right
+    def row(cells):
+        return " | ".join(str(c).ljust(w) for c, w in zip(cells, widths))
 
-    def row(vals):
-        return "│" + "│".join(
-            f" {str(v).center(w)} " for v, w in zip(vals, W.values())
-        ) + "│"
-
-    print(line("┌", "┬", "┐"))
-    print(row(["Method", "Env", "Eps", "Attempt 1", "Attempt 2", "Δ"]))
-    print(line("├", "┼", "┤"))
-    for r in rows:
-        print(row([
-            r["method"], r["env"], r["episodes"],
-            fmt_rate(r["attempt1_rate"]),
-            fmt_rate(r["attempt2_rate"]),
-            fmt_imp(r["improvement"]),
-        ]))
-    print(line("└", "┴", "┘"))
+    print(row(headers))
+    print("-+-".join("-" * w for w in widths))
+    for cells in table:
+        print(row(cells))
 
 
 def export_csv(rows: list, out_path: Path) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(
-            f, fieldnames=[
-                "method", "env", "episodes",
-                "attempt1_rate", "attempt2_rate", "improvement",
-            ],
+            f,
+            fieldnames=["method", "env", "episodes", "pass_rate"],
             extrasaction="ignore",
         )
         writer.writeheader()
@@ -98,7 +88,7 @@ def export_csv(rows: list, out_path: Path) -> None:
 
 
 def export_curve_csv(rows: list, out_path: Path) -> None:
-    """Wide CSV with one row per K and one column per (method, env, attempt)."""
+    """Wide CSV with one row per K and one column per (method, env)."""
     out_path.parent.mkdir(parents=True, exist_ok=True)
     max_k = max((r["episodes"] for r in rows), default=0)
     if max_k == 0:
@@ -109,10 +99,8 @@ def export_curve_csv(rows: list, out_path: Path) -> None:
     series = []
     for r in rows:
         tag = f"{r['method']}_{r['env']}"
-        headers.append(f"{tag}_a1")
-        headers.append(f"{tag}_a2")
-        series.append(r["running_attempt1_rate"])
-        series.append(r["running_attempt2_rate"])
+        headers.append(tag)
+        series.append(r["running_pass_rate"])
 
     with open(out_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
@@ -126,14 +114,14 @@ def export_curve_csv(rows: list, out_path: Path) -> None:
 
 
 def print_curve_waypoints(rows: list) -> None:
-    """Print running attempt-1 pass rate at 25/50/75/100% of episodes."""
+    """Print running pass rate at 25/50/75/100% of episodes."""
     if not rows:
         return
-    print("\nRunning attempt-1 pass rate (online — first K episodes):")
+    print("\nRunning pass rate (online, first K episodes):")
     print(f"  {'method_env':<22}  {'K=25%':>7}  {'K=50%':>7}  "
           f"{'K=75%':>7}  {'K=100%':>7}")
     for r in rows:
-        curve = r["running_attempt1_rate"]
+        curve = r["running_pass_rate"]
         n = len(curve)
         if n == 0:
             continue
@@ -141,7 +129,7 @@ def print_curve_waypoints(rows: list) -> None:
         vals = []
         for frac in (0.25, 0.5, 0.75, 1.0):
             k = max(1, int(round(frac * n)))
-            vals.append(f"{curve[k-1]*100:5.1f}%")
+            vals.append(f"{curve[k - 1] * 100:5.1f}%")
         print(f"  {tag:<22}  " + "  ".join(f"{v:>7}" for v in vals))
 
 
@@ -158,11 +146,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--csv", type=str, default=None,
                         help="Optional summary CSV output path.")
     parser.add_argument("--curve", action="store_true",
-                        help="Print running attempt-1 pass rate at "
-                             "K=25/50/75/100%% waypoints.")
+                        help="Print running pass rate at K=25/50/75/100%% waypoints.")
     parser.add_argument("--curve-csv", dest="curve_csv", default=None,
-                        help="Optional full-curve CSV output path "
-                             "(one row per K).")
+                        help="Optional full-curve CSV output path (one row per K).")
     return parser
 
 

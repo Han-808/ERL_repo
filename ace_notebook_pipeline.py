@@ -172,9 +172,7 @@ class ACENotebookPipeline:
             "actions":        actions,
             "feedback":       feedback,
             "reward":         reward,
-            "reward1":        reward,   # schema compat with summarize_logs
-            "reward2":        reward,   # schema compat with summarize_logs
-            "gated":          True,     # schema compat with print_episode_table
+            "reward1":        reward,
             "operations":     [str(op) for op in applied],
             "notebook_lines": len(self.notebook.to_string().splitlines()),
         }

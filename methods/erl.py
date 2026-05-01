@@ -1,7 +1,7 @@
 """
 ERL (Experiential Reinforcement Learning) method — BaseMethod-compatible.
 
-Implements the two-attempt + reflection + memory loop described in
+Implements a single-attempt + reflection + memory loop based on
 arXiv 2602.13949.  No training or gradient updates — inference only.
 
 Interaction model: the LM is called once per action step, sees the
@@ -18,16 +18,15 @@ from common import (
 )
 from prompts import (
     build_attempt1_prompt,
-    build_attempt2_prompt,
     build_reflection_prompt,
 )
 
 
-_SKIPPED = "Skipped (attempt 1 succeeded)"
+_SKIPPED = "Skipped (episode succeeded)"
 
 
 class ERLMethod(BaseMethod):
-    """ERL two-attempt + reflection + memory loop as a BaseMethod."""
+    """ERL single-attempt + reflection + memory loop as a BaseMethod."""
 
     name = "erl"
 
@@ -90,7 +89,9 @@ class ERLMethod(BaseMethod):
 
     def run_episode(self, episode_num: int) -> dict:
         initial_obs = self.env.reset(seed=episode_num)
-        actions1, feedback1, reward1 = self._run_attempt(build_attempt1_prompt)
+        actions1, feedback1, reward1 = self._run_attempt(
+            lambda obs: build_attempt1_prompt(obs, self.memory)
+        )
 
         print(f"\n{'='*40}")
         print(f"=== Episode {episode_num} ===")
@@ -100,13 +101,9 @@ class ERLMethod(BaseMethod):
         print(f"[Attempt 1] Reward:   {reward1}")
 
         if reward1 >= self.reward_threshold:
-            print("[Gated] Attempt 1 succeeded. Skipping reflection and attempt 2.")
+            print("[Reflection] Episode succeeded; skipping reflection.")
             reflection = _SKIPPED
-            actions2, feedback2, reward2 = actions1, feedback1, reward1
-            gated = True
         else:
-            gated = False
-
             prompt_r = build_reflection_prompt(
                 initial_obs, actions1, feedback1, reward1, self.memory
             )
@@ -116,16 +113,7 @@ class ERLMethod(BaseMethod):
             )
             print(f"\n[Reflection] {reflection}")
 
-            self.env.reset()
-            actions2, feedback2, reward2 = self._run_attempt(
-                lambda obs: build_attempt2_prompt(obs, reflection)
-            )
-
-            print(f"\n[Attempt 2] Actions:  {actions2}")
-            print(f"[Attempt 2] Feedback: {feedback2}")
-            print(f"[Attempt 2] Reward:   {reward2}")
-
-        if reward2 >= self.reward_threshold and reflection != _SKIPPED:
+        if reflection != _SKIPPED:
             self.memory.append(reflection)
             if len(self.memory) > self.memory_size:
                 self.memory.pop(0)
@@ -137,11 +125,7 @@ class ERLMethod(BaseMethod):
             "feedback1": feedback1,
             "reward1": reward1,
             "reflection": reflection,
-            "actions2": actions2,
-            "feedback2": feedback2,
-            "reward2": reward2,
             "memory_size": len(self.memory),
-            "gated": gated,
         }
 
     # -- Full experiment ----------------------------------------------------

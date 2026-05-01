@@ -40,10 +40,12 @@ def _notebook_factory(initial_notebook):
 METHODS = {
     "erl":                    (ERLMethod, "memory_size", "Memory Size"),
     "ace":                    (ACEMethod, "playbook_size", "Playbook Size"),
-    "notebook_minimal":       (_notebook_factory("default"),
+    "notebook_minimal":       (_notebook_factory("empty"),
                                "notebook_size", "Notebook Lines"),
     "notebook_minimal_empty": (_notebook_factory("empty"),
                                "notebook_size", "Notebook Lines"),
+    "notebook_minimal_default": (_notebook_factory("default"),
+                                 "notebook_size", "Notebook Lines"),
 }
 
 
