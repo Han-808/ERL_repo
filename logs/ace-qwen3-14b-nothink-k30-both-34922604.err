@@ -1,0 +1,1 @@
+/var/spool/slurmd/job34922604/slurm_script: line 53: 92083 Killed                  /mmfs1/gscratch/stf/mohanc3/.conda/envs/sglang311/bin/sglang serve --model-path Qwen/Qwen3-14B --host 127.0.0.1 --port 30000 --mem-fraction-static 0.45 --disable-cuda-graph --attention-backend triton --sampling-backend pytorch > "$RUN_DIR/sglang_server.log" 2>&1

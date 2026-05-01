@@ -5,16 +5,10 @@ REPO_DIR=/gscratch/stf/mohanc3/projects/ERL_repo
 UV=/gscratch/stf/mohanc3/uv-env/uv-bin/uv
 SGLANG=/mmfs1/gscratch/stf/mohanc3/.conda/envs/sglang311/bin/sglang
 
-MODEL=Qwen/Qwen3-8B
-MODEL_TAG=qwen3-8b
-EPISODES=28
-ENV_NAME=both
-METHODS=(ace notebook_minimal)
-
 mkdir -p "${REPO_DIR}/logs" "${REPO_DIR}/runs"
 
 sbatch \
-  --job-name="qwen3-8b-ace-notebook-k28-both" \
+  --job-name="ace-qwen3-14b-nothink-k30-both" \
   --account=stf \
   --partition=gpu-l40s \
   --nodes=1 \
@@ -34,6 +28,18 @@ sbatch \
     export NO_PROXY=localhost,127.0.0.1
     export no_proxy=localhost,127.0.0.1
 
+if [ -f /etc/profile.d/lmod.sh ]; then
+  source /etc/profile.d/lmod.sh
+elif [ -f /usr/share/lmod/lmod/init/bash ]; then
+  source /usr/share/lmod/lmod/init/bash
+elif [ -f /sw/lmod/lmod/init/bash ]; then
+  source /sw/lmod/lmod/init/bash
+fi
+
+module load cuda/12.4.1
+module load gcc/13.2.0
+
+
     export CUDA_HOME=/sw/cuda/12.4.1
     export CUDA_PATH=/sw/cuda/12.4.1
     export PATH=/sw/cuda/12.4.1/bin:/mmfs1/gscratch/stf/mohanc3/.conda/envs/sglang311/bin:\$PATH
@@ -48,33 +54,25 @@ sbatch \
     export TVM_FFI_CACHE_DIR=/gscratch/stf/mohanc3/tvm-ffi-cache
     export PYTHONUNBUFFERED=1
 
-    mkdir -p /gscratch/stf/mohanc3/hf-cache
-    mkdir -p /gscratch/stf/mohanc3/wandb
-    mkdir -p /gscratch/stf/mohanc3/xdg-cache
-    mkdir -p /gscratch/stf/mohanc3/torch-extensions
-    mkdir -p /gscratch/stf/mohanc3/tvm-ffi-cache
-
     export RUN_DIR=${REPO_DIR}/runs/\${SLURM_JOB_NAME}-\${SLURM_JOB_ID}
     mkdir -p \"\$RUN_DIR\" \"\$RUN_DIR/outputs\"
 
     echo \"Job: \$SLURM_JOB_NAME \$SLURM_JOB_ID\"
     echo \"Node: \$(hostname)\"
-    echo \"Model: ${MODEL}\"
-    echo \"Methods: ${METHODS[*]}\"
-    echo \"Env: ${ENV_NAME}\"
-    echo \"Episodes: ${EPISODES}\"
+    echo \"Model: Qwen/Qwen3-14B\"
+    echo \"Env: both\"
     which nvcc
     nvcc --version
 
     ${SGLANG} serve \
-      --model-path '${MODEL}' \
+      --model-path Qwen/Qwen3-14B \
       --host 127.0.0.1 \
       --port 30000 \
-      --mem-fraction-static 0.45 \
+      --mem-fraction-static 0.65 \
       --disable-cuda-graph \
       --attention-backend triton \
       --sampling-backend pytorch \
-      > /dev/null 2>&1 &
+      > \"\$RUN_DIR/sglang_server.log\" 2>&1 &
 
     SERVER_PID=\$!
 
@@ -94,21 +92,20 @@ sbatch \
 
     if ! curl --noproxy \"*\" -s http://127.0.0.1:30000/v1/models >/dev/null 2>&1; then
       echo \"ERROR: SGLang server failed to start\"
+      tail -100 \"\$RUN_DIR/sglang_server.log\" || true
       exit 1
     fi
 
-    for METHOD in ${METHODS[*]}; do
-      echo \"Running method: \$METHOD\"
-      ${UV} run python ${REPO_DIR}/run.py \
-        --method \"\$METHOD\" \
-        --env '${ENV_NAME}' \
-        --episodes ${EPISODES} \
-        --model '${MODEL}' \
-        --server http://127.0.0.1:30000/v1 \
-        --outputs-dir \"\$RUN_DIR/outputs\" \
-        --disable-thinking \
-        2>&1 | tee \"\$RUN_DIR/\${METHOD}_${MODEL_TAG}_nothink_k${EPISODES}_${ENV_NAME}.log\"
-    done
+    ${UV} run python ${REPO_DIR}/run.py \
+      --method ace \
+      --env both \
+      --episodes 30 \
+      --model Qwen/Qwen3-14B \
+      --server http://127.0.0.1:30000/v1 \
+      --outputs-dir \"\$RUN_DIR/outputs\" \
+      --disable-thinking \
+      2>&1 | tee \"\$RUN_DIR/ace_qwen3-14b_nothink_k30_both.log\"
 
     echo \"Done. RUN_DIR=\$RUN_DIR\"
   "
+

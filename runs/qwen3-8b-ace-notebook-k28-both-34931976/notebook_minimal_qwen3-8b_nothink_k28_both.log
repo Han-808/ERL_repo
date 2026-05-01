@@ -1,0 +1,643 @@
+LM traces will be saved to /gscratch/stf/mohanc3/projects/ERL_repo/runs/qwen3-8b-ace-notebook-k28-both-34931976/outputs/llm_calls_notebook_minimal_frozen_lake.jsonl
+Connected to LM server at http://127.0.0.1:30000/v1
+Model: Qwen/Qwen3-8B
+NotebookMinimal Method ready (initial_notebook=default).
+
+========================================
+=== Episode 1 ===
+========================================
+[Attempt 1] Actions:  ['Right', 'Down', 'Right', 'Up', 'Up', 'Down', 'Right', 'Up']
+[Attempt 1] Feedback: Step 1: moved Right, now on D (frozen tile). Step 2: moved Down, now on D (frozen tile). Step 3: moved Right, now on D (frozen tile). Step 4: moved Up, now on D (frozen tile). Step 5: moved Up, hit the boundary, stayed in place. Step 6: moved Down, now on D (frozen tile). Step 7: moved Right, now on D (frozen tile). Step 8: moved Up, stepped on C (hole), episode over.
+[Attempt 1] Reward:   0
+  Inserted after line 15
+[Notebook] 1 ops applied; now 18 lines.
+
+========================================
+=== Episode 2 ===
+========================================
+[Attempt 1] Actions:  ['Down', 'Down', 'Down', 'Down', 'Down', 'Down', 'Right']
+[Attempt 1] Feedback: Step 1: moved Down, now on D (frozen tile). Step 2: moved Down, hit the boundary, stayed in place. Step 3: moved Down, hit the boundary, stayed in place. Step 4: moved Down, hit the boundary, stayed in place. Step 5: moved Down, hit the boundary, stayed in place. Step 6: moved Down, hit the boundary, stayed in place. Step 7: moved Right, reached B (goal)!
+[Attempt 1] Reward:   1
+  Warning: skipping overlapping op {'type': 'insert_after', 'line': 17, 'content': "- 'B' is the goal tile; reaching it ends the episode successfully."}
+  Inserted after line 17
+[Notebook] 1 ops applied; now 19 lines.
+
+========================================
+=== Episode 3 ===
+========================================
+[Attempt 1] Actions:  ['Left', 'Left', 'Left', 'Right', 'Left', 'Up', 'Left', 'Left']
+[Attempt 1] Feedback: Step 1: moved Left, hit the boundary, stayed in place. Step 2: moved Left, hit the boundary, stayed in place. Step 3: moved Left, hit the boundary, stayed in place. Step 4: moved Right, now on D (frozen tile). Step 5: moved Left, now on D (frozen tile). Step 6: moved Up, hit the boundary, stayed in place. Step 7: moved Left, hit the boundary, stayed in place. Step 8: moved Left, hit the boundary, stayed in place. Maximum steps reached.
+[Attempt 1] Reward:   0
+  Inserted after line 19
+  Replaced lines 18-18
+  Inserted after line 17
+[Notebook] 3 ops applied; now 21 lines.
+
+========================================
+=== Episode 4 ===
+========================================
+[Attempt 1] Actions:  ['Right', 'Right', 'Right', 'Up', 'Up', 'Right']
+[Attempt 1] Feedback: Step 1: moved Right, now on D (frozen tile). Step 2: moved Right, now on D (frozen tile). Step 3: moved Right, now on D (frozen tile). Step 4: moved Up, hit the boundary, stayed in place. Step 5: moved Up, hit the boundary, stayed in place. Step 6: moved Right, stepped on C (hole), episode over.
+[Attempt 1] Reward:   0
+  Inserted after line 17
+[Notebook] 1 ops applied; now 22 lines.
+
+========================================
+=== Episode 5 ===
+========================================
+[Attempt 1] Actions:  ['Up', 'Up', 'Up', 'Up', 'Up', 'Up', 'Down']
+[Attempt 1] Feedback: Step 1: moved Up, hit the boundary, stayed in place. Step 2: moved Up, hit the boundary, stayed in place. Step 3: moved Up, hit the boundary, stayed in place. Step 4: moved Up, hit the boundary, stayed in place. Step 5: moved Up, hit the boundary, stayed in place. Step 6: moved Up, hit the boundary, stayed in place. Step 7: moved Down, stepped on C (hole), episode over.
+[Attempt 1] Reward:   0
+  Inserted after line 22
+  Inserted after line 21
+[Notebook] 2 ops applied; now 24 lines.
+[Warning] Could not parse action; using fallback 'Down'.
+
+========================================
+=== Episode 6 ===
+========================================
+[Attempt 1] Actions:  ['Right', 'Left', 'Left', 'Right', 'Down', 'Right', 'Down']
+[Attempt 1] Feedback: Step 1: moved Right, now on D (frozen tile). Step 2: moved Left, now on D (frozen tile). Step 3: moved Left, hit the boundary, stayed in place. Step 4: moved Right, now on D (frozen tile). Step 5: moved Down, now on D (frozen tile). Step 6: moved Right, now on D (frozen tile). Step 7: moved Down, reached B (goal)!
+[Attempt 1] Reward:   1
+  Inserted after line 20
+  Inserted after line 19
+[Notebook] 2 ops applied; now 26 lines.
+
+========================================
+=== Episode 7 ===
+========================================
+[Attempt 1] Actions:  ['Right', 'Right', 'Up', 'Down']
+[Attempt 1] Feedback: Step 1: moved Right, now on D (frozen tile). Step 2: moved Right, now on D (frozen tile). Step 3: moved Up, hit the boundary, stayed in place. Step 4: moved Down, stepped on C (hole), episode over.
+[Attempt 1] Reward:   0
+  Deleted lines 20-20
+  Replaced lines 18-18
+  Inserted after line 17
+[Notebook] 3 ops applied; now 26 lines.
+
+========================================
+=== Episode 8 ===
+========================================
+[Attempt 1] Actions:  ['Up', 'Up', 'Down']
+[Attempt 1] Feedback: Step 1: moved Up, hit the boundary, stayed in place. Step 2: moved Up, hit the boundary, stayed in place. Step 3: moved Down, stepped on C (hole), episode over.
+[Attempt 1] Reward:   0
+  Inserted after line 27
+  Deleted lines 18-22
+  Inserted after line 17
+[Notebook] 3 ops applied; now 24 lines.
+
+========================================
+=== Episode 9 ===
+========================================
+[Attempt 1] Actions:  ['Right', 'Left', 'Down', 'Left', 'Left', 'Left', 'Left', 'Left']
+[Attempt 1] Feedback: Step 1: moved Right, now on D (frozen tile). Step 2: moved Left, now on D (frozen tile). Step 3: moved Down, now on D (frozen tile). Step 4: moved Left, hit the boundary, stayed in place. Step 5: moved Left, hit the boundary, stayed in place. Step 6: moved Left, hit the boundary, stayed in place. Step 7: moved Left, hit the boundary, stayed in place. Step 8: moved Left, hit the boundary, stayed in place. Maximum steps reached.
+[Attempt 1] Reward:   0
+  Inserted after line 23
+  Deleted lines 18-18
+  Inserted after line 17
+[Notebook] 3 ops applied; now 25 lines.
+
+========================================
+=== Episode 10 ===
+========================================
+[Attempt 1] Actions:  ['Down', 'Down', 'Down', 'Down', 'Down', 'Down', 'Down', 'Down']
+[Attempt 1] Feedback: Step 1: moved Down, now on D (frozen tile). Step 2: moved Down, hit the boundary, stayed in place. Step 3: moved Down, hit the boundary, stayed in place. Step 4: moved Down, hit the boundary, stayed in place. Step 5: moved Down, hit the boundary, stayed in place. Step 6: moved Down, hit the boundary, stayed in place. Step 7: moved Down, hit the boundary, stayed in place. Step 8: moved Down, hit the boundary, stayed in place. Maximum steps reached.
+[Attempt 1] Reward:   0
+  Inserted after line 23
+[Notebook] 1 ops applied; now 26 lines.
+
+========================================
+=== Episode 11 ===
+========================================
+[Attempt 1] Actions:  ['Right', 'Left', 'Right', 'Right', 'Right', 'Right', 'Right']
+[Attempt 1] Feedback: Step 1: moved Right, now on D (frozen tile). Step 2: moved Left, now on D (frozen tile). Step 3: moved Right, now on D (frozen tile). Step 4: moved Right, now on D (frozen tile). Step 5: moved Right, now on D (frozen tile). Step 6: moved Right, now on D (frozen tile). Step 7: moved Right, stepped on C (hole), episode over.
+[Attempt 1] Reward:   0
+  Inserted after line 23
+[Notebook] 1 ops applied; now 27 lines.
+
+========================================
+=== Episode 12 ===
+========================================
+[Attempt 1] Actions:  ['Up', 'Right', 'Down', 'Up', 'Up', 'Right', 'Down']
+[Attempt 1] Feedback: Step 1: moved Up, hit the boundary, stayed in place. Step 2: moved Right, now on D (frozen tile). Step 3: moved Down, now on D (frozen tile). Step 4: moved Up, now on D (frozen tile). Step 5: moved Up, hit the boundary, stayed in place. Step 6: moved Right, now on D (frozen tile). Step 7: moved Down, stepped on C (hole), episode over.
+[Attempt 1] Reward:   0
+  Inserted after line 26
+[Notebook] 1 ops applied; now 28 lines.
+
+========================================
+=== Episode 13 ===
+========================================
+[Attempt 1] Actions:  ['Down', 'Right', 'Down']
+[Attempt 1] Feedback: Step 1: moved Down, now on D (frozen tile). Step 2: moved Right, now on D (frozen tile). Step 3: moved Down, stepped on C (hole), episode over.
+[Attempt 1] Reward:   0
+  Inserted after line 25
+[Notebook] 1 ops applied; now 29 lines.
+
+========================================
+=== Episode 14 ===
+========================================
+[Attempt 1] Actions:  ['Right', 'Right', 'Up', 'Right', 'Down', 'Right', 'Right', 'Left']
+[Attempt 1] Feedback: Step 1: moved Right, now on D (frozen tile). Step 2: moved Right, now on D (frozen tile). Step 3: moved Up, hit the boundary, stayed in place. Step 4: moved Right, hit the boundary, stayed in place. Step 5: moved Down, now on D (frozen tile). Step 6: moved Right, hit the boundary, stayed in place. Step 7: moved Right, hit the boundary, stayed in place. Step 8: moved Left, now on D (frozen tile). Maximum steps reached.
+[Attempt 1] Reward:   0
+  Inserted after line 24
+  Inserted after line 23
+[Notebook] 2 ops applied; now 31 lines.
+
+========================================
+=== Episode 15 ===
+========================================
+[Attempt 1] Actions:  ['Down', 'Right', 'Right', 'Down', 'Right']
+[Attempt 1] Feedback: Step 1: moved Down, now on D (frozen tile). Step 2: moved Right, now on D (frozen tile). Step 3: moved Right, now on D (frozen tile). Step 4: moved Down, now on D (frozen tile). Step 5: moved Right, stepped on C (hole), episode over.
+[Attempt 1] Reward:   0
+  Inserted after line 29
+[Notebook] 1 ops applied; now 32 lines.
+
+========================================
+=== Episode 16 ===
+========================================
+[Attempt 1] Actions:  ['Right', 'Down', 'Right', 'Left', 'Right', 'Right', 'Left', 'Down']
+[Attempt 1] Feedback: Step 1: moved Right, now on D (frozen tile). Step 2: moved Down, now on D (frozen tile). Step 3: moved Right, now on D (frozen tile). Step 4: moved Left, now on D (frozen tile). Step 5: moved Right, now on D (frozen tile). Step 6: moved Right, now on D (frozen tile). Step 7: moved Left, now on D (frozen tile). Step 8: moved Down, now on D (frozen tile). Maximum steps reached.
+[Attempt 1] Reward:   0
+  Inserted after line 32
+  Deleted lines 18-18
+[Notebook] 2 ops applied; now 32 lines.
+
+========================================
+=== Episode 17 ===
+========================================
+[Attempt 1] Actions:  ['Down']
+[Attempt 1] Feedback: Step 1: moved Down, stepped on C (hole), episode over.
+[Attempt 1] Reward:   0
+  Warning: skipping overlapping op {'type': 'insert_after', 'line': 27, 'content': "Avoid moving Down from 'D' tiles near the bottom boundary; it can lead to stepping on 'C' tiles."}
+  Deleted lines 25-27
+[Notebook] 1 ops applied; now 29 lines.
+
+========================================
+=== Episode 18 ===
+========================================
+[Attempt 1] Actions:  ['Down', 'Down', 'Left', 'Down', 'Down', 'Down', 'Down', 'Down']
+[Attempt 1] Feedback: Step 1: moved Down, now on D (frozen tile). Step 2: moved Down, now on D (frozen tile). Step 3: moved Left, hit the boundary, stayed in place. Step 4: moved Down, now on D (frozen tile). Step 5: moved Down, hit the boundary, stayed in place. Step 6: moved Down, hit the boundary, stayed in place. Step 7: moved Down, hit the boundary, stayed in place. Step 8: moved Down, hit the boundary, stayed in place. Maximum steps reached.
+[Attempt 1] Reward:   0
+  Inserted after line 22
+  Replaced lines 15-16
+[Notebook] 2 ops applied; now 29 lines.
+
+========================================
+=== Episode 19 ===
+========================================
+[Attempt 1] Actions:  ['Right', 'Down']
+[Attempt 1] Feedback: Step 1: moved Right, now on D (frozen tile). Step 2: moved Down, reached B (goal)!
+[Attempt 1] Reward:   1
+  Inserted after line 20
+[Notebook] 1 ops applied; now 30 lines.
+
+========================================
+=== Episode 20 ===
+========================================
+[Attempt 1] Actions:  ['Down', 'Left', 'Right', 'Left', 'Left', 'Left', 'Right', 'Down']
+[Attempt 1] Feedback: Step 1: moved Down, now on D (frozen tile). Step 2: moved Left, hit the boundary, stayed in place. Step 3: moved Right, now on D (frozen tile). Step 4: moved Left, now on D (frozen tile). Step 5: moved Left, hit the boundary, stayed in place. Step 6: moved Left, hit the boundary, stayed in place. Step 7: moved Right, now on D (frozen tile). Step 8: moved Down, stepped on C (hole), episode over.
+[Attempt 1] Reward:   0
+  Inserted after line 30
+[Notebook] 1 ops applied; now 31 lines.
+
+========================================
+=== Episode 21 ===
+========================================
+[Attempt 1] Actions:  ['Down', 'Left', 'Right', 'Right', 'Left', 'Right', 'Left', 'Right']
+[Attempt 1] Feedback: Step 1: moved Down, now on D (frozen tile). Step 2: moved Left, hit the boundary, stayed in place. Step 3: moved Right, now on D (frozen tile). Step 4: moved Right, now on D (frozen tile). Step 5: moved Left, now on D (frozen tile). Step 6: moved Right, now on D (frozen tile). Step 7: moved Left, now on D (frozen tile). Step 8: moved Right, now on D (frozen tile). Maximum steps reached.
+[Attempt 1] Reward:   0
+  Inserted after line 21
+[Notebook] 1 ops applied; now 32 lines.
+
+========================================
+=== Episode 22 ===
+========================================
+[Attempt 1] Actions:  ['Left', 'Left', 'Left', 'Right', 'Left', 'Down', 'Left', 'Left']
+[Attempt 1] Feedback: Step 1: moved Left, hit the boundary, stayed in place. Step 2: moved Left, hit the boundary, stayed in place. Step 3: moved Left, hit the boundary, stayed in place. Step 4: moved Right, now on D (frozen tile). Step 5: moved Left, now on D (frozen tile). Step 6: moved Down, now on D (frozen tile). Step 7: moved Left, hit the boundary, stayed in place. Step 8: moved Left, hit the boundary, stayed in place. Maximum steps reached.
+[Attempt 1] Reward:   0
+  Inserted after line 31
+[Notebook] 1 ops applied; now 33 lines.
+
+========================================
+=== Episode 23 ===
+========================================
+[Attempt 1] Actions:  ['Left', 'Up', 'Left', 'Down', 'Left', 'Down']
+[Attempt 1] Feedback: Step 1: moved Left, hit the boundary, stayed in place. Step 2: moved Up, hit the boundary, stayed in place. Step 3: moved Left, hit the boundary, stayed in place. Step 4: moved Down, now on D (frozen tile). Step 5: moved Left, hit the boundary, stayed in place. Step 6: moved Down, stepped on C (hole), episode over.
+[Attempt 1] Reward:   0
+  Inserted after line 31
+[Notebook] 1 ops applied; now 34 lines.
+
+========================================
+=== Episode 24 ===
+========================================
+[Attempt 1] Actions:  ['Left', 'Left', 'Left', 'Left', 'Up', 'Left', 'Left', 'Right']
+[Attempt 1] Feedback: Step 1: moved Left, hit the boundary, stayed in place. Step 2: moved Left, hit the boundary, stayed in place. Step 3: moved Left, hit the boundary, stayed in place. Step 4: moved Left, hit the boundary, stayed in place. Step 5: moved Up, hit the boundary, stayed in place. Step 6: moved Left, hit the boundary, stayed in place. Step 7: moved Left, hit the boundary, stayed in place. Step 8: moved Right, now on D (frozen tile). Maximum steps reached.
+[Attempt 1] Reward:   0
+  Inserted after line 24
+  Deleted lines 18-23
+  Inserted after line 17
+[Notebook] 3 ops applied; now 30 lines.
+
+========================================
+=== Episode 25 ===
+========================================
+[Attempt 1] Actions:  ['Left', 'Right', 'Up', 'Up', 'Left', 'Up', 'Up', 'Up']
+[Attempt 1] Feedback: Step 1: moved Left, hit the boundary, stayed in place. Step 2: moved Right, now on D (frozen tile). Step 3: moved Up, hit the boundary, stayed in place. Step 4: moved Up, hit the boundary, stayed in place. Step 5: moved Left, now on D (frozen tile). Step 6: moved Up, hit the boundary, stayed in place. Step 7: moved Up, hit the boundary, stayed in place. Step 8: moved Up, hit the boundary, stayed in place. Maximum steps reached.
+[Attempt 1] Reward:   0
+  Inserted after line 27
+[Notebook] 1 ops applied; now 31 lines.
+
+========================================
+=== Episode 26 ===
+========================================
+[Attempt 1] Actions:  ['Down', 'Left', 'Left', 'Left', 'Down', 'Left', 'Left', 'Left']
+[Attempt 1] Feedback: Step 1: moved Down, now on D (frozen tile). Step 2: moved Left, hit the boundary, stayed in place. Step 3: moved Left, hit the boundary, stayed in place. Step 4: moved Left, hit the boundary, stayed in place. Step 5: moved Down, now on D (frozen tile). Step 6: moved Left, hit the boundary, stayed in place. Step 7: moved Left, hit the boundary, stayed in place. Step 8: moved Left, hit the boundary, stayed in place. Maximum steps reached.
+[Attempt 1] Reward:   0
+  Inserted after line 29
+  Replaced lines 20-20
+[Notebook] 2 ops applied; now 32 lines.
+
+========================================
+=== Episode 27 ===
+========================================
+[Attempt 1] Actions:  ['Left', 'Up', 'Up', 'Right', 'Right', 'Left', 'Down', 'Left']
+[Attempt 1] Feedback: Step 1: moved Left, hit the boundary, stayed in place. Step 2: moved Up, hit the boundary, stayed in place. Step 3: moved Up, hit the boundary, stayed in place. Step 4: moved Right, now on D (frozen tile). Step 5: moved Right, now on D (frozen tile). Step 6: moved Left, now on D (frozen tile). Step 7: moved Down, now on D (frozen tile). Step 8: moved Left, stepped on C (hole), episode over.
+[Attempt 1] Reward:   0
+  Replaced lines 31-31
+  Deleted lines 29-30
+  Inserted after line 28
+[Notebook] 3 ops applied; now 31 lines.
+
+========================================
+=== Episode 28 ===
+========================================
+[Attempt 1] Actions:  ['Down', 'Left', 'Down', 'Left', 'Right', 'Left', 'Left', 'Right']
+[Attempt 1] Feedback: Step 1: moved Down, now on D (frozen tile). Step 2: moved Left, hit the boundary, stayed in place. Step 3: moved Down, now on D (frozen tile). Step 4: moved Left, hit the boundary, stayed in place. Step 5: moved Right, now on D (frozen tile). Step 6: moved Left, now on D (frozen tile). Step 7: moved Left, hit the boundary, stayed in place. Step 8: moved Right, now on D (frozen tile). Maximum steps reached.
+[Attempt 1] Reward:   0
+  Warning: skipping overlapping op {'type': 'insert_after', 'line': 20, 'content': "When on a 'D' tile, analyze adjacent tiles to determine safe movement directions and avoid boundary collisions."}
+  Inserted after line 21
+  Deleted lines 19-20
+[Notebook] 2 ops applied; now 30 lines.
+
+========================================
+SUMMARY (FrozenLake, 28 episodes)
+========================================
+Attempt 1 success rate: 3/28 (10.7%)
+Attempt 2 success rate: 3/28 (10.7%)
+Improvement:            +0.0%
+  running attempt-1 @ K=  7: 28.6%
+  running attempt-1 @ K= 14: 14.3%
+  running attempt-1 @ K= 21: 14.3%
+  running attempt-1 @ K= 28: 10.7%
+┌─────────┬───────────┬───────────┬────────┬────────────────┐
+│ Episode │  Reward 1 │  Reward 2 │ Gated  │ Notebook Lines │
+├─────────┼───────────┼───────────┼────────┼────────────────┤
+│    1    │     0     │     0     │  Yes   │       18       │
+│    2    │     1     │     1     │  Yes   │       19       │
+│    3    │     0     │     0     │  Yes   │       21       │
+│    4    │     0     │     0     │  Yes   │       22       │
+│    5    │     0     │     0     │  Yes   │       24       │
+│    6    │     1     │     1     │  Yes   │       26       │
+│    7    │     0     │     0     │  Yes   │       26       │
+│    8    │     0     │     0     │  Yes   │       24       │
+│    9    │     0     │     0     │  Yes   │       25       │
+│    10   │     0     │     0     │  Yes   │       26       │
+│    11   │     0     │     0     │  Yes   │       27       │
+│    12   │     0     │     0     │  Yes   │       28       │
+│    13   │     0     │     0     │  Yes   │       29       │
+│    14   │     0     │     0     │  Yes   │       31       │
+│    15   │     0     │     0     │  Yes   │       32       │
+│    16   │     0     │     0     │  Yes   │       32       │
+│    17   │     0     │     0     │  Yes   │       29       │
+│    18   │     0     │     0     │  Yes   │       29       │
+│    19   │     1     │     1     │  Yes   │       30       │
+│    20   │     0     │     0     │  Yes   │       31       │
+│    21   │     0     │     0     │  Yes   │       32       │
+│    22   │     0     │     0     │  Yes   │       33       │
+│    23   │     0     │     0     │  Yes   │       34       │
+│    24   │     0     │     0     │  Yes   │       30       │
+│    25   │     0     │     0     │  Yes   │       31       │
+│    26   │     0     │     0     │  Yes   │       32       │
+│    27   │     0     │     0     │  Yes   │       31       │
+│    28   │     0     │     0     │  Yes   │       30       │
+└─────────┴───────────┴───────────┴────────┴────────────────┘
+Saved to /gscratch/stf/mohanc3/projects/ERL_repo/runs/qwen3-8b-ace-notebook-k28-both-34931976/outputs/results_notebook_minimal_frozen_lake.json
+LM traces will be saved to /gscratch/stf/mohanc3/projects/ERL_repo/runs/qwen3-8b-ace-notebook-k28-both-34931976/outputs/llm_calls_notebook_minimal_sokoban.jsonl
+Connected to LM server at http://127.0.0.1:30000/v1
+Model: Qwen/Qwen3-8B
+NotebookMinimal Method ready (initial_notebook=default).
+
+========================================
+=== Episode 1 ===
+========================================
+[Attempt 1] Actions:  ['Down', 'Down', 'Up', 'Up']
+[Attempt 1] Feedback: Step 1: moved Down. Step 2: moved Down, hit E (wall), stayed in place. Step 3: moved Up. Step 4: moved Up, pushed B onto C (goal)! All boxes are on targets. Puzzle solved!
+[Attempt 1] Reward:   1
+  Warning: skipping overlapping op {'type': 'insert_after', 'line': 17, 'content': ' - Avoid moving into walls (E) as it results in staying in place.'}
+  Inserted after line 17
+[Notebook] 1 ops applied; now 18 lines.
+
+========================================
+=== Episode 2 ===
+========================================
+[Attempt 1] Actions:  ['Right', 'Down', 'Right', 'Right', 'Up', 'Up', 'Up', 'Down']
+[Attempt 1] Feedback: Step 1: moved Right. Step 2: moved Down, hit E (wall), stayed in place. Step 3: moved Right, hit E (wall), stayed in place. Step 4: moved Right, hit E (wall), stayed in place. Step 5: moved Up. Step 6: moved Up. Step 7: moved Up. Step 8: moved Down. Maximum steps reached.
+[Attempt 1] Reward:   0
+  Inserted after line 18
+  Inserted after line 16
+[Notebook] 2 ops applied; now 20 lines.
+
+========================================
+=== Episode 3 ===
+========================================
+[Attempt 1] Actions:  ['Down']
+[Attempt 1] Feedback: Step 1: moved Down, pushed B onto C (goal)! All boxes are on targets. Puzzle solved!
+[Attempt 1] Reward:   1
+  Inserted after line 21
+  Inserted after line 19
+[Notebook] 2 ops applied; now 23 lines.
+
+========================================
+=== Episode 4 ===
+========================================
+[Attempt 1] Actions:  ['Down']
+[Attempt 1] Feedback: Step 1: moved Down, pushed B onto C (goal)! All boxes are on targets. Puzzle solved!
+[Attempt 1] Reward:   1
+  Replaced lines 21-22
+  Inserted after line 20
+[Notebook] 2 ops applied; now 23 lines.
+
+========================================
+=== Episode 5 ===
+========================================
+[Attempt 1] Actions:  ['Right', 'Down', 'Down', 'Down', 'Right', 'Down', 'Right', 'Up']
+[Attempt 1] Feedback: Step 1: moved Right. Step 2: moved Down. Step 3: moved Down, hit E (wall), stayed in place. Step 4: moved Down, hit E (wall), stayed in place. Step 5: moved Right, hit E (wall), stayed in place. Step 6: moved Down, hit E (wall), stayed in place. Step 7: moved Right, hit E (wall), stayed in place. Step 8: moved Up. Maximum steps reached.
+[Attempt 1] Reward:   0
+  Inserted after line 23
+  Deleted lines 21-22
+  Inserted after line 18
+[Notebook] 3 ops applied; now 23 lines.
+
+========================================
+=== Episode 6 ===
+========================================
+[Attempt 1] Actions:  ['Right', 'Down', 'Down', 'Up', 'Down', 'Down', 'Down', 'Up']
+[Attempt 1] Feedback: Step 1: moved Right, hit E (wall), stayed in place. Step 2: moved Down. Step 3: moved Down. Step 4: moved Up. Step 5: moved Down. Step 6: moved Down. Step 7: moved Down, hit E (wall), stayed in place. Step 8: moved Up. Maximum steps reached.
+[Attempt 1] Reward:   0
+  Replaced lines 20-22
+  Inserted after line 19
+[Notebook] 2 ops applied; now 22 lines.
+
+========================================
+=== Episode 7 ===
+========================================
+[Attempt 1] Actions:  ['Down', 'Down', 'Left', 'Right', 'Right', 'Down', 'Right', 'Down']
+[Attempt 1] Feedback: Step 1: moved Down, hit E (wall), stayed in place. Step 2: moved Down, hit E (wall), stayed in place. Step 3: moved Left. Step 4: moved Right. Step 5: moved Right, hit E (wall), stayed in place. Step 6: moved Down, hit E (wall), stayed in place. Step 7: moved Right, hit E (wall), stayed in place. Step 8: moved Down, hit E (wall), stayed in place. Maximum steps reached.
+[Attempt 1] Reward:   0
+  Replaced lines 21-22
+  Inserted after line 18
+[Notebook] 2 ops applied; now 22 lines.
+
+========================================
+=== Episode 8 ===
+========================================
+[Attempt 1] Actions:  ['Right']
+[Attempt 1] Feedback: Step 1: moved Right, pushed B onto C (goal)! All boxes are on targets. Puzzle solved!
+[Attempt 1] Reward:   1
+  Inserted after line 12
+[Notebook] 1 ops applied; now 23 lines.
+
+========================================
+=== Episode 9 ===
+========================================
+[Attempt 1] Actions:  ['Right']
+[Attempt 1] Feedback: Step 1: moved Right, pushed B onto C (goal)! All boxes are on targets. Puzzle solved!
+[Attempt 1] Reward:   1
+  Warning: skipping overlapping op {'type': 'insert_after', 'line': 22, 'content': ' - Recognize that pushing a box onto a target (e.g., B to C) is a critical success condition.'}
+  Deleted lines 20-22
+[Notebook] 1 ops applied; now 20 lines.
+
+========================================
+=== Episode 10 ===
+========================================
+[Attempt 1] Actions:  ['Down', 'Down', 'Up', 'Down', 'Right', 'Right', 'Up', 'Down']
+[Attempt 1] Feedback: Step 1: moved Down. Step 2: moved Down. Step 3: moved Up. Step 4: moved Down. Step 5: moved Right. Step 6: moved Right, hit E (wall), stayed in place. Step 7: moved Up. Step 8: moved Down. Maximum steps reached.
+[Attempt 1] Reward:   0
+  Inserted after line 17
+[Notebook] 1 ops applied; now 21 lines.
+
+========================================
+=== Episode 11 ===
+========================================
+[Attempt 1] Actions:  ['Right', 'Down', 'Down', 'Up', 'Left']
+[Attempt 1] Feedback: Step 1: moved Right, hit E (wall), stayed in place. Step 2: moved Down. Step 3: moved Down, hit E (wall), stayed in place. Step 4: moved Up. Step 5: moved Left, pushed B onto C (goal)! All boxes are on targets. Puzzle solved!
+[Attempt 1] Reward:   1
+  Inserted after line 20
+  Inserted after line 19
+  Deleted lines 16-16
+[Notebook] 3 ops applied; now 22 lines.
+
+========================================
+=== Episode 12 ===
+========================================
+[Attempt 1] Actions:  ['Left', 'Left', 'Right', 'Right']
+[Attempt 1] Feedback: Step 1: moved Left. Step 2: moved Left, hit E (wall), stayed in place. Step 3: moved Right. Step 4: moved Right, pushed B onto C (goal)! All boxes are on targets. Puzzle solved!
+[Attempt 1] Reward:   1
+  Inserted after line 20
+  Deleted lines 17-18
+[Notebook] 2 ops applied; now 21 lines.
+
+========================================
+=== Episode 13 ===
+========================================
+[Attempt 1] Actions:  ['Right', 'Right', 'Right']
+[Attempt 1] Feedback: Step 1: moved Right, pushed B. Step 2: moved Right, pushed B. Step 3: moved Right, pushed B onto C (goal)! All boxes are on targets. Puzzle solved!
+[Attempt 1] Reward:   1
+  Inserted after line 20
+[Notebook] 1 ops applied; now 22 lines.
+
+========================================
+=== Episode 14 ===
+========================================
+[Attempt 1] Actions:  ['Right']
+[Attempt 1] Feedback: Step 1: moved Right, pushed B onto C (goal)! All boxes are on targets. Puzzle solved!
+[Attempt 1] Reward:   1
+  Inserted after line 21
+[Notebook] 1 ops applied; now 23 lines.
+
+========================================
+=== Episode 15 ===
+========================================
+[Attempt 1] Actions:  ['Left']
+[Attempt 1] Feedback: Step 1: moved Left, pushed B onto C (goal)! All boxes are on targets. Puzzle solved!
+[Attempt 1] Reward:   1
+  Inserted after line 22
+[Notebook] 1 ops applied; now 24 lines.
+
+========================================
+=== Episode 16 ===
+========================================
+[Attempt 1] Actions:  ['Right', 'Right', 'Right', 'Right', 'Right', 'Right', 'Right', 'Right']
+[Attempt 1] Feedback: Step 1: moved Right. Step 2: moved Right, hit E (wall), stayed in place. Step 3: moved Right, hit E (wall), stayed in place. Step 4: moved Right, hit E (wall), stayed in place. Step 5: moved Right, hit E (wall), stayed in place. Step 6: moved Right, hit E (wall), stayed in place. Step 7: moved Right, hit E (wall), stayed in place. Step 8: moved Right, hit E (wall), stayed in place. Maximum steps reached.
+[Attempt 1] Reward:   0
+  Inserted after line 24
+[Notebook] 1 ops applied; now 25 lines.
+
+========================================
+=== Episode 17 ===
+========================================
+[Attempt 1] Actions:  ['Right', 'Left', 'Down', 'Right', 'Left', 'Down', 'Right', 'Right']
+[Attempt 1] Feedback: Step 1: moved Right. Step 2: moved Left. Step 3: moved Down, pushed B. Step 4: moved Right. Step 5: moved Left. Step 6: moved Down, pushed B. Step 7: moved Right. Step 8: moved Right. Maximum steps reached.
+[Attempt 1] Reward:   0
+  Inserted after line 24
+[Notebook] 1 ops applied; now 26 lines.
+
+========================================
+=== Episode 18 ===
+========================================
+[Attempt 1] Actions:  ['Down', 'Up', 'Left', 'Down', 'Left', 'Up', 'Right', 'Up']
+[Attempt 1] Feedback: Step 1: moved Down, hit E (wall), stayed in place. Step 2: moved Up, pushed B. Step 3: moved Left. Step 4: moved Down. Step 5: moved Left. Step 6: moved Up. Step 7: moved Right. Step 8: moved Up. Maximum steps reached.
+[Attempt 1] Reward:   0
+  Inserted after line 24
+  Replaced lines 17-18
+[Notebook] 2 ops applied; now 26 lines.
+
+========================================
+=== Episode 19 ===
+========================================
+[Attempt 1] Actions:  ['Up', 'Up']
+[Attempt 1] Feedback: Step 1: moved Up, pushed B. Step 2: moved Up, pushed B onto C (goal)! All boxes are on targets. Puzzle solved!
+[Attempt 1] Reward:   1
+  Inserted after line 22
+[Notebook] 1 ops applied; now 27 lines.
+
+========================================
+=== Episode 20 ===
+========================================
+[Attempt 1] Actions:  ['Right', 'Left', 'Up', 'Right', 'Right', 'Right', 'Up', 'Right']
+[Attempt 1] Feedback: Step 1: moved Right. Step 2: moved Left. Step 3: moved Up, pushed B. Step 4: moved Right. Step 5: moved Right. Step 6: moved Right, hit E (wall), stayed in place. Step 7: moved Up. Step 8: moved Right, hit E (wall), stayed in place. Maximum steps reached.
+[Attempt 1] Reward:   0
+  Inserted after line 27
+[Notebook] 1 ops applied; now 28 lines.
+
+========================================
+=== Episode 21 ===
+========================================
+[Attempt 1] Actions:  ['Right', 'Down', 'Right', 'Right', 'Right', 'Down', 'Right', 'Right']
+[Attempt 1] Feedback: Step 1: moved Right. Step 2: moved Down. Step 3: moved Right. Step 4: moved Right, hit E (wall), stayed in place. Step 5: moved Right, hit E (wall), stayed in place. Step 6: moved Down. Step 7: moved Right, hit E (wall), stayed in place. Step 8: moved Right, hit E (wall), stayed in place. Maximum steps reached.
+[Attempt 1] Reward:   0
+  Inserted after line 28
+[Notebook] 1 ops applied; now 29 lines.
+
+========================================
+=== Episode 22 ===
+========================================
+[Attempt 1] Actions:  ['Right']
+[Attempt 1] Feedback: Step 1: moved Right, pushed B onto C (goal)! All boxes are on targets. Puzzle solved!
+[Attempt 1] Reward:   1
+  Deleted lines 23-23
+  Deleted lines 20-22
+  Inserted after line 19
+[Notebook] 3 ops applied; now 26 lines.
+
+========================================
+=== Episode 23 ===
+========================================
+[Attempt 1] Actions:  ['Down', 'Up', 'Right', 'Left', 'Up', 'Up']
+[Attempt 1] Feedback: Step 1: moved Down. Step 2: moved Up. Step 3: moved Right. Step 4: moved Left. Step 5: moved Up, pushed B. Step 6: moved Up, pushed B onto C (goal)! All boxes are on targets. Puzzle solved!
+[Attempt 1] Reward:   1
+  Inserted after line 20
+[Notebook] 1 ops applied; now 27 lines.
+
+========================================
+=== Episode 24 ===
+========================================
+[Attempt 1] Actions:  ['Left']
+[Attempt 1] Feedback: Step 1: moved Left, pushed B onto C (goal)! All boxes are on targets. Puzzle solved!
+[Attempt 1] Reward:   1
+  Warning: skipping overlapping op {'type': 'insert_after', 'line': 21, 'content': ' - When B and C are adjacent, directly pushing B onto C is the most efficient and reliable way to solve the puzzle.'}
+  Deleted lines 20-21
+[Notebook] 1 ops applied; now 25 lines.
+
+========================================
+=== Episode 25 ===
+========================================
+[Attempt 1] Actions:  ['Down', 'Down']
+[Attempt 1] Feedback: Step 1: moved Down, pushed B. Step 2: moved Down, pushed B onto C (goal)! All boxes are on targets. Puzzle solved!
+[Attempt 1] Reward:   1
+  Replaced lines 21-21
+  Inserted after line 20
+[Notebook] 2 ops applied; now 26 lines.
+
+========================================
+=== Episode 26 ===
+========================================
+[Attempt 1] Actions:  ['Down', 'Down', 'Down', 'Down', 'Right', 'Right', 'Down', 'Down']
+[Attempt 1] Feedback: Step 1: moved Down. Step 2: moved Down. Step 3: moved Down. Step 4: moved Down, hit E (wall), stayed in place. Step 5: moved Right. Step 6: moved Right. Step 7: moved Down, hit E (wall), stayed in place. Step 8: moved Down, hit E (wall), stayed in place. Maximum steps reached.
+[Attempt 1] Reward:   0
+  Deleted lines 24-26
+  Inserted after line 22
+  Inserted after line 20
+[Notebook] 3 ops applied; now 25 lines.
+
+========================================
+=== Episode 27 ===
+========================================
+[Attempt 1] Actions:  ['Down', 'Down']
+[Attempt 1] Feedback: Step 1: moved Down, pushed B. Step 2: moved Down, pushed B onto C (goal)! All boxes are on targets. Puzzle solved!
+[Attempt 1] Reward:   1
+  Inserted after line 22
+[Notebook] 1 ops applied; now 26 lines.
+
+========================================
+=== Episode 28 ===
+========================================
+[Attempt 1] Actions:  ['Down', 'Down', 'Right', 'Down', 'Down', 'Down', 'Down', 'Down']
+[Attempt 1] Feedback: Step 1: moved Down. Step 2: moved Down. Step 3: moved Right, hit E (wall), stayed in place. Step 4: moved Down, hit E (wall), stayed in place. Step 5: moved Down, hit E (wall), stayed in place. Step 6: moved Down, hit E (wall), stayed in place. Step 7: moved Down, hit E (wall), stayed in place. Step 8: moved Down, hit E (wall), stayed in place. Maximum steps reached.
+[Attempt 1] Reward:   0
+  Replaced lines 21-21
+  Inserted after line 20
+[Notebook] 2 ops applied; now 27 lines.
+
+========================================
+SUMMARY (Sokoban, 28 episodes)
+========================================
+Attempt 1 success rate: 16/28 (57.1%)
+Attempt 2 success rate: 16/28 (57.1%)
+Improvement:            +0.0%
+  running attempt-1 @ K=  7: 42.9%
+  running attempt-1 @ K= 14: 64.3%
+  running attempt-1 @ K= 21: 52.4%
+  running attempt-1 @ K= 28: 57.1%
+┌─────────┬───────────┬───────────┬────────┬────────────────┐
+│ Episode │  Reward 1 │  Reward 2 │ Gated  │ Notebook Lines │
+├─────────┼───────────┼───────────┼────────┼────────────────┤
+│    1    │     1     │     1     │  Yes   │       18       │
+│    2    │     0     │     0     │  Yes   │       20       │
+│    3    │     1     │     1     │  Yes   │       23       │
+│    4    │     1     │     1     │  Yes   │       23       │
+│    5    │     0     │     0     │  Yes   │       23       │
+│    6    │     0     │     0     │  Yes   │       22       │
+│    7    │     0     │     0     │  Yes   │       22       │
+│    8    │     1     │     1     │  Yes   │       23       │
+│    9    │     1     │     1     │  Yes   │       20       │
+│    10   │     0     │     0     │  Yes   │       21       │
+│    11   │     1     │     1     │  Yes   │       22       │
+│    12   │     1     │     1     │  Yes   │       21       │
+│    13   │     1     │     1     │  Yes   │       22       │
+│    14   │     1     │     1     │  Yes   │       23       │
+│    15   │     1     │     1     │  Yes   │       24       │
+│    16   │     0     │     0     │  Yes   │       25       │
+│    17   │     0     │     0     │  Yes   │       26       │
+│    18   │     0     │     0     │  Yes   │       26       │
+│    19   │     1     │     1     │  Yes   │       27       │
+│    20   │     0     │     0     │  Yes   │       28       │
+│    21   │     0     │     0     │  Yes   │       29       │
+│    22   │     1     │     1     │  Yes   │       26       │
+│    23   │     1     │     1     │  Yes   │       27       │
+│    24   │     1     │     1     │  Yes   │       25       │
+│    25   │     1     │     1     │  Yes   │       26       │
+│    26   │     0     │     0     │  Yes   │       25       │
+│    27   │     1     │     1     │  Yes   │       26       │
+│    28   │     0     │     0     │  Yes   │       27       │
+└─────────┴───────────┴───────────┴────────┴────────────────┘
+Saved to /gscratch/stf/mohanc3/projects/ERL_repo/runs/qwen3-8b-ace-notebook-k28-both-34931976/outputs/results_notebook_minimal_sokoban.json
