@@ -65,6 +65,8 @@ sbatch \
 
     if [ -f /etc/profile.d/modules.sh ]; then
       . /etc/profile.d/modules.sh
+    elif [ -f /etc/profile.d/lmod.sh ]; then
+      . /etc/profile.d/lmod.sh
     elif [ -f /sw/lmod/lmod/init/bash ]; then
       . /sw/lmod/lmod/init/bash
     fi
@@ -76,6 +78,7 @@ sbatch \
 
     module load cuda/12.4.1
     module load gcc/13.2.0
+    module list
 
     export CUDA_HOME=/sw/cuda/12.4.1
     export CUDA_PATH=/sw/cuda/12.4.1
@@ -114,8 +117,14 @@ sbatch \
     echo \"SGLang log: \$SGLANG_LOG\"
     which nvcc
     nvcc --version
+    echo \"which gcc: \$(which gcc)\"
     echo \"gcc: \$(gcc --version | head -1)\"
+    echo \"which g++: \$(which g++)\"
     echo \"g++: \$(g++ --version | head -1)\"
+    if ! gcc --version | head -1 | grep -Eq '13\\.2\\.0|1[1-9]\\.|[2-9][0-9]\\.'; then
+      echo \"ERROR: GCC module did not activate; SGLang JIT needs a newer host compiler.\"
+      exit 1
+    fi
 
     ${SGLANG} serve \
       --model-path '${MODEL}' \
