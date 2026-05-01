@@ -44,13 +44,13 @@ fi
 
 sbatch \
   --job-name="${JOB_NAME}" \
-  --account=h2lab \
-  --partition=gpu-a100 \
+  --account=stf \
+  --partition=gpu-l40s \
   --nodes=1 \
   --ntasks=1 \
   --cpus-per-task=8 \
-  --gpus=a100:1 \
-  --mem=128G \
+  --gpus=l40s:1 \
+  --mem=64G \
   --time=6:00:00 \
   --output="${REPO_DIR}/logs/%x-%j.out" \
   --error="${REPO_DIR}/logs/%x-%j.err" \
@@ -63,10 +63,16 @@ sbatch \
     export NO_PROXY=localhost,127.0.0.1
     export no_proxy=localhost,127.0.0.1
 
+    module load cuda/12.4.1
+    module load gcc/13.2.0
+
     export CUDA_HOME=/sw/cuda/12.4.1
     export CUDA_PATH=/sw/cuda/12.4.1
     export PATH=/sw/cuda/12.4.1/bin:/mmfs1/gscratch/stf/mohanc3/.conda/envs/sglang311/bin:\$PATH
     export LD_LIBRARY_PATH=/sw/cuda/12.4.1/lib64:\${LD_LIBRARY_PATH:-}
+    export CC=\$(which gcc)
+    export CXX=\$(which g++)
+    export CUDAHOSTCXX=\$(which g++)
 
     export HF_HOME=/gscratch/stf/mohanc3/hf-cache
     export TRANSFORMERS_CACHE=/gscratch/stf/mohanc3/hf-cache
@@ -97,6 +103,8 @@ sbatch \
     echo \"SGLang log: \$SGLANG_LOG\"
     which nvcc
     nvcc --version
+    echo \"gcc: \$(gcc --version | head -1)\"
+    echo \"g++: \$(g++ --version | head -1)\"
 
     ${SGLANG} serve \
       --model-path '${MODEL}' \
