@@ -1,0 +1,114 @@
+Connected to LM server at http://localhost:30000/v1
+Model: Qwen/Qwen3-4B
+ACE Method ready.
+[LM error] Connection error.
+[Warning] Could not parse action; using fallback 'Down'.
+
+========================================
+=== Episode 1 ===
+========================================
+[Attempt 1] Actions:  ['Down']
+[Attempt 1] Feedback: Step 1: moved Down, stepped on C (hole), episode over.
+[Attempt 1] Reward:   0
+[LM error] Connection error.
+
+[Reflector raw]
+
+[Reflector] Structured reflection captured
+[LM error] Connection error.
+
+[Curator raw]
+
+[Curator] Approved 0 delta items
+[Playbook] apply_delta: +0 add / ~0 modify / -0 delete (0 skipped)
+[Playbook] Size now: 0
+[LM error] Connection error.
+[Warning] Could not parse action; using fallback 'Down'.
+
+[Attempt 2] Actions:  ['Down']
+[Attempt 2] Feedback: Step 1: moved Down, stepped on C (hole), episode over.
+[Attempt 2] Reward:   0
+
+========================================
+SUMMARY (FrozenLake, 1 episodes)
+========================================
+Attempt 1 success rate: 0/1 (0.0%)
+Attempt 2 success rate: 0/1 (0.0%)
+Improvement:            +0.0%
+┌─────────┬───────────┬───────────┬────────┬────────────────┐
+│ Episode │  Reward 1 │  Reward 2 │ Gated  │ Playbook Size  │
+├─────────┼───────────┼───────────┼────────┼────────────────┤
+│    1    │     0     │     0     │   No   │       0        │
+└─────────┴───────────┴───────────┴────────┴────────────────┘
+Saved to /gscratch/stf/mohanc3/projects/ERL_repo/runs/smoke-qwen3-4b-nothink-k1/outputs/results_ace_frozen_lake.json
+Connected to LM server at http://localhost:30000/v1
+Model: Qwen/Qwen3-4B
+ACE Method ready.
+[LM error] Connection error.
+[Warning] Could not parse action; using fallback 'Down'.
+[LM error] Connection error.
+[Warning] Could not parse action; using fallback 'Down'.
+[LM error] Connection error.
+[Warning] Could not parse action; using fallback 'Down'.
+[LM error] Connection error.
+[Warning] Could not parse action; using fallback 'Down'.
+[LM error] Connection error.
+[Warning] Could not parse action; using fallback 'Down'.
+[LM error] Connection error.
+[Warning] Could not parse action; using fallback 'Down'.
+[LM error] Connection error.
+[Warning] Could not parse action; using fallback 'Down'.
+[LM error] Connection error.
+[Warning] Could not parse action; using fallback 'Down'.
+
+========================================
+=== Episode 1 ===
+========================================
+[Attempt 1] Actions:  ['Down', 'Down', 'Down', 'Down', 'Down', 'Down', 'Down', 'Down']
+[Attempt 1] Feedback: Step 1: moved Down. Step 2: moved Down, hit E (wall), stayed in place. Step 3: moved Down, hit E (wall), stayed in place. Step 4: moved Down, hit E (wall), stayed in place. Step 5: moved Down, hit E (wall), stayed in place. Step 6: moved Down, hit E (wall), stayed in place. Step 7: moved Down, hit E (wall), stayed in place. Step 8: moved Down, hit E (wall), stayed in place. Maximum steps reached.
+[Attempt 1] Reward:   0
+[LM error] Connection error.
+
+[Reflector raw]
+
+[Reflector] Structured reflection captured
+[LM error] Connection error.
+
+[Curator raw]
+
+[Curator] Approved 0 delta items
+[Playbook] apply_delta: +0 add / ~0 modify / -0 delete (0 skipped)
+[Playbook] Size now: 0
+[LM error] Connection error.
+[Warning] Could not parse action; using fallback 'Down'.
+[LM error] Connection error.
+[Warning] Could not parse action; using fallback 'Down'.
+[LM error] Connection error.
+[Warning] Could not parse action; using fallback 'Down'.
+[LM error] Connection error.
+[Warning] Could not parse action; using fallback 'Down'.
+[LM error] Connection error.
+[Warning] Could not parse action; using fallback 'Down'.
+[LM error] Connection error.
+[Warning] Could not parse action; using fallback 'Down'.
+[LM error] Connection error.
+[Warning] Could not parse action; using fallback 'Down'.
+[LM error] Connection error.
+[Warning] Could not parse action; using fallback 'Down'.
+
+[Attempt 2] Actions:  ['Down', 'Down', 'Down', 'Down', 'Down', 'Down', 'Down', 'Down']
+[Attempt 2] Feedback: Step 1: moved Down. Step 2: moved Down, hit E (wall), stayed in place. Step 3: moved Down, hit E (wall), stayed in place. Step 4: moved Down, hit E (wall), stayed in place. Step 5: moved Down, hit E (wall), stayed in place. Step 6: moved Down, hit E (wall), stayed in place. Step 7: moved Down, hit E (wall), stayed in place. Step 8: moved Down, hit E (wall), stayed in place. Maximum steps reached.
+[Attempt 2] Reward:   0
+
+========================================
+SUMMARY (Sokoban, 1 episodes)
+========================================
+Attempt 1 success rate: 0/1 (0.0%)
+Attempt 2 success rate: 0/1 (0.0%)
+Improvement:            +0.0%
+┌─────────┬───────────┬───────────┬────────┬────────────────┐
+│ Episode │  Reward 1 │  Reward 2 │ Gated  │ Playbook Size  │
+├─────────┼───────────┼───────────┼────────┼────────────────┤
+│    1    │     0     │     0     │   No   │       0        │
+└─────────┴───────────┴───────────┴────────┴────────────────┘
+Saved to /gscratch/stf/mohanc3/projects/ERL_repo/runs/smoke-qwen3-4b-nothink-k1/outputs/results_ace_sokoban.json
