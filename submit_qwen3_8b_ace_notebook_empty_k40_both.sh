@@ -30,14 +30,15 @@ grep -Eq 'MAX_N[[:space:]]*=[[:space:]]*5' "${REPO_DIR}/environments/frozen_lake
   exit 1
 }
 
-if grep -R -E 'reward2|actions2|feedback2|gated|Attempt 2|build_attempt2' \
+if second_attempt_matches=$(grep -R -I -n -E 'reward2|actions2|feedback2|gated|Attempt 2|build_attempt2' \
   "${REPO_DIR}/common.py" \
   "${REPO_DIR}/run.py" \
   "${REPO_DIR}/prompts.py" \
   "${REPO_DIR}/methods" \
   "${REPO_DIR}/environments" \
-  "${REPO_DIR}/ace_notebook_pipeline.py" >/dev/null; then
+  "${REPO_DIR}/ace_notebook_pipeline.py"); then
   echo "ERROR: second-attempt code markers are still present."
+  echo "${second_attempt_matches}"
   exit 1
 fi
 
