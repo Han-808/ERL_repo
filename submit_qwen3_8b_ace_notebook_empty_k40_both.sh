@@ -44,7 +44,7 @@ fi
 
 sbatch \
   --job-name="${JOB_NAME}" \
-  --account=stf \
+  --account=h2lab \
   --partition=gpu-l40s \
   --nodes=1 \
   --ntasks=1 \
