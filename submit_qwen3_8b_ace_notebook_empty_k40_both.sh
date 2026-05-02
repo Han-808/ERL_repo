@@ -82,11 +82,12 @@ sbatch \
 
     export CUDA_HOME=/sw/cuda/12.4.1
     export CUDA_PATH=/sw/cuda/12.4.1
-    export PATH=/sw/cuda/12.4.1/bin:/mmfs1/gscratch/stf/mohanc3/.conda/envs/sglang311/bin:\$PATH
-    export LD_LIBRARY_PATH=/sw/cuda/12.4.1/lib64:\${LD_LIBRARY_PATH:-}
-    export CC=\$(which gcc)
-    export CXX=\$(which g++)
-    export CUDAHOSTCXX=\$(which g++)
+    export PATH=/sw/gcc/13.2.0/bin:/sw/cuda/12.4.1/bin:/mmfs1/gscratch/stf/mohanc3/.conda/envs/sglang311/bin:\$PATH
+    export LD_LIBRARY_PATH=/sw/gcc/13.2.0/lib64:/sw/cuda/12.4.1/lib64:\${LD_LIBRARY_PATH:-}
+    export CC=/sw/gcc/13.2.0/bin/gcc
+    export CXX=/sw/gcc/13.2.0/bin/g++
+    export CUDAHOSTCXX=/sw/gcc/13.2.0/bin/g++
+    export NVCC_PREPEND_FLAGS='-ccbin=/sw/gcc/13.2.0/bin/g++'
 
     export HF_HOME=/gscratch/h2lab/mohanc3/hf-cache
     export TRANSFORMERS_CACHE=/gscratch/h2lab/mohanc3/hf-cache
@@ -121,6 +122,10 @@ sbatch \
     echo \"gcc: \$(gcc --version | head -1)\"
     echo \"which g++: \$(which g++)\"
     echo \"g++: \$(g++ --version | head -1)\"
+    echo \"CC: \$CC\"
+    echo \"CXX: \$CXX\"
+    echo \"CUDAHOSTCXX: \$CUDAHOSTCXX\"
+    echo \"NVCC_PREPEND_FLAGS: \$NVCC_PREPEND_FLAGS\"
     if ! gcc --version | head -1 | grep -Eq '13\\.2\\.0|1[1-9]\\.|[2-9][0-9]\\.'; then
       echo \"ERROR: GCC module did not activate; SGLang JIT needs a newer host compiler.\"
       exit 1
@@ -132,6 +137,7 @@ sbatch \
       --port 30000 \
       --mem-fraction-static 0.45 \
       --disable-cuda-graph \
+      --disable-piecewise-cuda-graph \
       --attention-backend triton \
       --sampling-backend pytorch \
       > \"\$SGLANG_LOG\" 2>&1 &
