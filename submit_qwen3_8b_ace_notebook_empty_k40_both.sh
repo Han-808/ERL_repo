@@ -63,23 +63,6 @@ sbatch \
     export NO_PROXY=localhost,127.0.0.1
     export no_proxy=localhost,127.0.0.1
 
-    if [ -f /etc/profile.d/modules.sh ]; then
-      . /etc/profile.d/modules.sh
-    elif [ -f /etc/profile.d/lmod.sh ]; then
-      . /etc/profile.d/lmod.sh
-    elif [ -f /sw/lmod/lmod/init/bash ]; then
-      . /sw/lmod/lmod/init/bash
-    fi
-
-    if ! command -v module >/dev/null 2>&1; then
-      echo \"ERROR: module command is unavailable after initialization\"
-      exit 1
-    fi
-
-    module load cuda/12.4.1
-    module load gcc/13.2.0
-    module list
-
     export CUDA_HOME=/sw/cuda/12.4.1
     export CUDA_PATH=/sw/cuda/12.4.1
     export PATH=/sw/gcc/13.2.0/bin:/sw/cuda/12.4.1/bin:/mmfs1/gscratch/stf/mohanc3/.conda/envs/sglang311/bin:\$PATH
@@ -127,7 +110,7 @@ sbatch \
     echo \"CUDAHOSTCXX: \$CUDAHOSTCXX\"
     echo \"NVCC_PREPEND_FLAGS: \$NVCC_PREPEND_FLAGS\"
     if ! gcc --version | head -1 | grep -Eq '13\\.2\\.0|1[1-9]\\.|[2-9][0-9]\\.'; then
-      echo \"ERROR: GCC module did not activate; SGLang JIT needs a newer host compiler.\"
+      echo \"ERROR: GCC 13 is not active; SGLang JIT needs a newer host compiler.\"
       exit 1
     fi
 
