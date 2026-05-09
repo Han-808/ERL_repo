@@ -484,6 +484,26 @@ def selected_envs(env_arg: str) -> list[str]:
     return [env_arg]
 
 
+def filter_states(states: list[NotebookState], args) -> list[NotebookState]:
+    """Apply optional state range and shard selection."""
+    out = states
+    if args.state_start is not None:
+        out = [state for state in out if state.state_x >= args.state_start]
+    if args.state_end is not None:
+        out = [state for state in out if state.state_x <= args.state_end]
+
+    if args.num_shards < 1:
+        raise ValueError("--num-shards must be >= 1")
+    if args.shard_index < 0 or args.shard_index >= args.num_shards:
+        raise ValueError("--shard-index must satisfy 0 <= index < num_shards")
+    if args.num_shards > 1:
+        out = [
+            state for state in out
+            if (state.state_x - 1) % args.num_shards == args.shard_index
+        ]
+    return out
+
+
 def make_run_dir(outputs_dir: Path, run_name: str | None) -> Path:
     if run_name is None:
         run_name = time.strftime("single_turn_passk_%Y%m%d_%H%M%S")
@@ -508,6 +528,12 @@ def run_eval(args) -> Path:
             print(
                 f"[warning] {env_name}: requested {args.num_states} states, "
                 f"found {len(states)} in {trace_path}"
+            )
+        states = filter_states(states, args)
+        if not states:
+            raise ValueError(
+                f"{env_name}: no notebook states selected after applying "
+                "range/shard filters."
             )
         states_by_env[env_name] = states
 
@@ -556,6 +582,14 @@ def run_eval(args) -> Path:
         "env": args.env,
         "envs": env_names,
         "num_states_requested": args.num_states,
+        "state_start": args.state_start,
+        "state_end": args.state_end,
+        "num_shards": args.num_shards,
+        "shard_index": args.shard_index,
+        "selected_states": {
+            env_name: [state.state_x for state in states_by_env[env_name]]
+            for env_name in env_names
+        },
         "samples_y": args.samples_y,
         "games_z": args.games_z,
         "total_rollouts_planned": (
@@ -697,6 +731,30 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=40,
         help="Number of notebook states to recover/evaluate (default: 40).",
+    )
+    parser.add_argument(
+        "--state-start",
+        type=int,
+        default=None,
+        help="Optional first notebook state x to evaluate, inclusive.",
+    )
+    parser.add_argument(
+        "--state-end",
+        type=int,
+        default=None,
+        help="Optional last notebook state x to evaluate, inclusive.",
+    )
+    parser.add_argument(
+        "--num-shards",
+        type=int,
+        default=1,
+        help="Split selected states across this many shards (default: 1).",
+    )
+    parser.add_argument(
+        "--shard-index",
+        type=int,
+        default=0,
+        help="Zero-based shard index to run when --num-shards > 1.",
     )
     parser.add_argument(
         "--samples-y",
