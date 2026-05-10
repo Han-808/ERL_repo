@@ -3,14 +3,17 @@ set -euo pipefail
 
 # Submit a safe sharded single-turn pass@k eval for notebook_minimal.
 #
+# Deprecated filename kept for compatibility. Prefer:
+#   submit_single_turn_passk_qwen3_14b_nothink_array.sh
+#
 # Default shape:
-#   4 Slurm array tasks, 1 GPU each, Qwen3-8B, no thinking.
+#   4 Slurm array tasks, 1 GPU each, Qwen3-14B, no thinking.
 #   Each task evaluates a disjoint shard of notebook states for both
 #   FrozenLake and Sokoban.
 #
 # Usage:
-#   bash submit_single_turn_passk_qwen3_8b_nothink_array.sh --dry-run
-#   bash submit_single_turn_passk_qwen3_8b_nothink_array.sh
+#   bash submit_single_turn_passk_qwen3_14b_nothink_array.sh --dry-run
+#   bash submit_single_turn_passk_qwen3_14b_nothink_array.sh
 
 REPO_DIR="${REPO_DIR:-/gscratch/h2lab/mohanc3/projects/ERL_repo}"
 UV="${UV:-/gscratch/stf/mohanc3/uv-env/uv-bin/uv}"
@@ -24,8 +27,8 @@ GPU_REQUEST="${GPU_REQUEST:-l40s:1}"
 NUM_SHARDS="${NUM_SHARDS:-4}"
 ARRAY_MAX_CONCURRENT="${ARRAY_MAX_CONCURRENT:-4}"
 
-MODEL="${MODEL:-Qwen/Qwen3-8B}"
-MODEL_TAG="${MODEL_TAG:-qwen3-8b}"
+MODEL="${MODEL:-Qwen/Qwen3-14B}"
+MODEL_TAG="${MODEL_TAG:-qwen3-14b}"
 ENV_NAME="${ENV_NAME:-both}"
 NUM_STATES="${NUM_STATES:-40}"
 SAMPLES_Y="${SAMPLES_Y:-8}"
@@ -33,8 +36,8 @@ GAMES_Z="${GAMES_Z:-10}"
 BASE_SEED="${BASE_SEED:-20260509}"
 
 CPUS_PER_TASK="${CPUS_PER_TASK:-8}"
-MEM="${MEM:-96G}"
-TIME_LIMIT="${TIME_LIMIT:-24:00:00}"
+MEM="${MEM:-128G}"
+TIME_LIMIT="${TIME_LIMIT:-36:00:00}"
 SGLANG_MEM_FRACTION="${SGLANG_MEM_FRACTION:-0.55}"
 
 JOB_NAME="${JOB_NAME:-passk-${MODEL_TAG}-nothink-k${NUM_STATES}-y${SAMPLES_Y}-z${GAMES_Z}}"
@@ -115,8 +118,7 @@ SBATCH_CMD=(
     PORT=\$((30000 + SHARD_INDEX))
     RUN_NAME=\"\${SLURM_JOB_NAME}-\${SLURM_ARRAY_JOB_ID}-shard\${SHARD_INDEX}\"
     RUN_DIR='${RUNS_DIR}'/\"\${RUN_NAME}\"
-    mkdir -p \"\$RUN_DIR\"
-    SGLANG_LOG=\"\$RUN_DIR/sglang_server.log\"
+    SGLANG_LOG='${LOG_DIR}'/\"\${RUN_NAME}-sglang_server.log\"
 
     echo \"Job: \$SLURM_JOB_NAME array=\$SLURM_ARRAY_JOB_ID task=\$SHARD_INDEX\"
     echo \"Node: \$(hostname)\"

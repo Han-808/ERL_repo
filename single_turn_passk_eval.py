@@ -508,7 +508,7 @@ def make_run_dir(outputs_dir: Path, run_name: str | None) -> Path:
     if run_name is None:
         run_name = time.strftime("single_turn_passk_%Y%m%d_%H%M%S")
     run_dir = outputs_dir / run_name
-    run_dir.mkdir(parents=True, exist_ok=False)
+    run_dir.mkdir(parents=True, exist_ok=True)
     return run_dir
 
 

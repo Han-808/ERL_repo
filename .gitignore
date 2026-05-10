@@ -6,3 +6,8 @@ results_*.json
 .env
 .claude/
 outputs/
+
+# Large local evaluation artifacts. Keep summaries/plots in Git, but do not
+# track raw LLM call traces because GitHub rejects files over 100 MB.
+pass@k-singleturn_*/**/llm_calls_single_turn_passk_*.jsonl
+single_turn_passk_runs/**/llm_calls_single_turn_passk_*.jsonl
