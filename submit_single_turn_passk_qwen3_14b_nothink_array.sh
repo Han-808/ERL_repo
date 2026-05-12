@@ -4,7 +4,7 @@ set -euo pipefail
 # Submit a safe sharded single-turn pass@k eval for notebook_minimal.
 #
 # Default shape:
-#   4 Slurm array tasks, 1 GPU each, Qwen3-14B, no thinking.
+#   4 Slurm array tasks, 1 A100 GPU each, Qwen3-14B, no thinking.
 #   Each task evaluates a disjoint shard of notebook states for both
 #   FrozenLake and Sokoban.
 #
@@ -17,10 +17,11 @@ UV="${UV:-/gscratch/stf/mohanc3/uv-env/uv-bin/uv}"
 SGLANG="${SGLANG:-/mmfs1/gscratch/stf/mohanc3/.conda/envs/sglang311/bin/sglang}"
 
 ACCOUNT="${ACCOUNT:-h2lab}"
-PARTITION="${PARTITION:-gpu-l40s}"
-GPU_REQUEST="${GPU_REQUEST:-l40s:1}"
+PARTITION="${PARTITION:-gpu-a100}"
+GPU_REQUEST="${GPU_REQUEST:-a100:1}"
 
-# h2lab/gpu-l40s has 8 total GPUs in your allocation, so 4 is half.
+# Use four independent one-GPU shards. Override NUM_SHARDS and
+# ARRAY_MAX_CONCURRENT at submit time if the cluster is busy.
 NUM_SHARDS="${NUM_SHARDS:-4}"
 ARRAY_MAX_CONCURRENT="${ARRAY_MAX_CONCURRENT:-4}"
 
@@ -35,7 +36,7 @@ BASE_SEED="${BASE_SEED:-20260509}"
 CPUS_PER_TASK="${CPUS_PER_TASK:-8}"
 MEM="${MEM:-128G}"
 TIME_LIMIT="${TIME_LIMIT:-36:00:00}"
-SGLANG_MEM_FRACTION="${SGLANG_MEM_FRACTION:-0.55}"
+SGLANG_MEM_FRACTION="${SGLANG_MEM_FRACTION:-0.85}"
 
 JOB_NAME="${JOB_NAME:-passk-${MODEL_TAG}-nothink-k${NUM_STATES}-y${SAMPLES_Y}-z${GAMES_Z}}"
 LOG_DIR="${REPO_DIR}/logs"
