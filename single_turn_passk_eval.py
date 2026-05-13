@@ -5,11 +5,16 @@ This workflow freezes each notebook state from a previous notebook_minimal
 run, then evaluates that fixed notebook on fresh randomized grid games.
 
 Default experiment shape per environment:
-  40 notebook states x 8 independent samples x 10 games per sample.
+  40 notebook states x 8 independent samples x 20 games per sample.
+
+For a given environment, the z game instances are generated once from
+base_seed and reused across all notebook states and samples. This keeps the
+evaluation grid fixed while allowing y to measure independent LM samples.
 
 Outputs are written under:
   single_turn_passk_runs/<run_name>/
     config.json
+    instance_seeds.json
     notebook_states.jsonl
     rollouts.jsonl
     sample_summary.csv
@@ -30,6 +35,7 @@ import hashlib
 import json
 import math
 import os
+import random
 import statistics
 import time
 from dataclasses import asdict, dataclass
@@ -186,20 +192,41 @@ def load_notebook_states(
     return states
 
 
-def rollout_seed(
+def make_instance_seed_bank(
     base_seed: int,
+    env_names: list[str],
+    games_z: int,
+) -> dict[str, list[int]]:
+    """Generate z fixed game-instance seeds per environment.
+
+    The generated seeds intentionally do not depend on state_x or sample_y, so
+    every notebook state and every sample batch is evaluated on the same z
+    environment instances.
+    """
+    if games_z < 1:
+        raise ValueError("--games-z must be >= 1")
+
+    out: dict[str, list[int]] = {}
+    for env_name in env_names:
+        rng = random.Random(base_seed + ENV_SEED_OFFSETS[env_name])
+        seeds: list[int] = []
+        seen: set[int] = set()
+        while len(seeds) < games_z:
+            seed = rng.randrange(1, 2**31 - 1)
+            if seed in seen:
+                continue
+            seen.add(seed)
+            seeds.append(seed)
+        out[env_name] = seeds
+    return out
+
+
+def rollout_seed(
+    instance_seed_bank: dict[str, list[int]],
     env_name: str,
-    state_x: int,
-    sample_y: int,
     game_z: int,
 ) -> int:
-    return (
-        base_seed
-        + ENV_SEED_OFFSETS[env_name]
-        + state_x * 1_000_000
-        + sample_y * 10_000
-        + game_z
-    )
+    return instance_seed_bank[env_name][game_z - 1]
 
 
 def run_fixed_notebook_game(
@@ -578,6 +605,12 @@ def run_eval(args) -> Path:
     else:
         disable_thinking = bool(args.disable_thinking)
 
+    instance_seed_bank = make_instance_seed_bank(
+        args.base_seed,
+        env_names,
+        args.games_z,
+    )
+
     config = {
         "env": args.env,
         "envs": env_names,
@@ -599,9 +632,13 @@ def run_eval(args) -> Path:
         ),
         "base_seed": args.base_seed,
         "seed_formula": (
-            "base_seed + env_offset + state_x*1000000 + "
-            "sample_y*10000 + game_z"
+            "For each env, generate games_z seeds with "
+            "random.Random(base_seed + env_offset). The selected seed is "
+            "instance_seeds[env][game_z-1] and is shared across all "
+            "state_x/sample_y pairs."
         ),
+        "instance_seed_policy": "shared_across_state_x_and_sample_y",
+        "instance_seeds": instance_seed_bank,
         "reward_threshold": args.reward_threshold,
         "model": model,
         "server": args.server,
@@ -623,6 +660,7 @@ def run_eval(args) -> Path:
         "extract_only": args.extract_only,
     }
     write_json(run_dir / "config.json", config)
+    write_json(run_dir / "instance_seeds.json", instance_seed_bank)
 
     all_state_rows = [
         asdict(state)
@@ -654,10 +692,8 @@ def run_eval(args) -> Path:
                 for sample_y in range(1, args.samples_y + 1):
                     for game_z in range(1, args.games_z + 1):
                         seed = rollout_seed(
-                            args.base_seed,
+                            instance_seed_bank,
                             env_name,
-                            state.state_x,
-                            sample_y,
                             game_z,
                         )
                         game = run_fixed_notebook_game(
@@ -765,8 +801,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--games-z",
         type=int,
-        default=10,
-        help="Randomized games per sample batch (default: 10).",
+        default=20,
+        help=(
+            "Fixed randomized game instances per sample batch, shared across "
+            "all states and samples for each environment (default: 20)."
+        ),
     )
     parser.add_argument(
         "--base-seed",
