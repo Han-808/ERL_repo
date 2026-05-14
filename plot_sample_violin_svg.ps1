@@ -11,7 +11,9 @@ param(
 
   [int]$Width = 1320,
 
-  [int]$PanelHeight = 360
+  [int]$PanelHeight = 360,
+
+  [double]$DensityThreshold = 0.04
 )
 
 Set-StrictMode -Version Latest
@@ -98,7 +100,7 @@ $svg.Add('<?xml version="1.0" encoding="UTF-8"?>')
 $svg.Add("<svg xmlns=`"http://www.w3.org/2000/svg`" width=`"$Width`" height=`"$Height`" viewBox=`"0 0 $Width $Height`">")
 $svg.Add("<rect width=`"100%`" height=`"100%`" fill=`"#ffffff`"/>")
 $svg.Add("<style>")
-$svg.Add("text{font-family:Arial,Helvetica,sans-serif;fill:#1f2937}.axis{stroke:#374151;stroke-width:1}.grid{stroke:#d1d5db;stroke-width:1;stroke-dasharray:3 4}.violin{fill:#7aa6c2;fill-opacity:.42;stroke:#335f78;stroke-width:1}.mean{fill:none;stroke:#d94f45;stroke-width:2.2}.median{stroke:#17445e;stroke-width:1.4}.dot{fill:#143d59;fill-opacity:.72}.tick{font-size:11px}.label{font-size:13px}.panel-title{font-size:15px;font-weight:700}.title{font-size:18px;font-weight:700}.note{font-size:12px;fill:#4b5563}")
+$svg.Add("text{font-family:Arial,Helvetica,sans-serif;fill:#1f2937}.axis{stroke:#374151;stroke-width:1}.grid{stroke:#d1d5db;stroke-width:1;stroke-dasharray:3 4}.violin{fill:#7aa6c2;fill-opacity:.42;stroke:#335f78;stroke-width:1}.mean{fill:none;stroke:#d94f45;stroke-width:2.2}.median{stroke:#17445e;stroke-width:1.8}.dot{fill:#143d59;fill-opacity:.72}.tick{font-size:11px}.label{font-size:13px}.panel-title{font-size:15px;font-weight:700}.title{font-size:18px;font-weight:700}.note{font-size:12px;fill:#4b5563}")
 $svg.Add("</style>")
 $svg.Add("<text x=`"$(ToFixed ($Width / 2.0) 1)`" y=`"28`" text-anchor=`"middle`" class=`"title`">$(SvgEscape $Title)</text>")
 
@@ -117,7 +119,7 @@ for ($panelIndex = 0; $panelIndex -lt $envs.Count; $panelIndex++) {
   $maxHalfWidth = [math]::Min(13.0, $xStep * 0.38)
 
   $svg.Add("<text x=`"$plotLeft`" y=`"$($panelTop + 18)`" class=`"panel-title`">$(SvgEscape (EnvLabel $envName))</text>")
-  $svg.Add("<text x=`"$plotRight`" y=`"$($panelTop + 18)`" text-anchor=`"end`" class=`"note`">violin = 8 sample pass rates per state; red line = mean</text>")
+  $svg.Add("<text x=`"$plotRight`" y=`"$($panelTop + 18)`" text-anchor=`"end`" class=`"note`">violin = KDE over 8 samples; red = mean; dark tick = median; low-density tails truncated</text>")
 
   foreach ($tick in 0, 0.25, 0.5, 0.75, 1.0) {
     $y = $plotBottom - ([double]$tick * $innerHeight)
@@ -147,9 +149,20 @@ for ($panelIndex = 0; $panelIndex -lt $envs.Count; $panelIndex++) {
     }
     if ($maxDensity -le 0) { $maxDensity = 1.0 }
 
+    $active = @($densities | Where-Object { ([double]$_.D / $maxDensity) -ge $DensityThreshold })
+    if ($active.Count -eq 0) {
+      $active = $densities
+    } else {
+      $firstActive = [double]($active | Select-Object -First 1).Y
+      $lastActive = [double]($active | Select-Object -Last 1).Y
+      $active = @($densities | Where-Object {
+        [double]$_.Y -ge $firstActive -and [double]$_.Y -le $lastActive
+      })
+    }
+
     $leftPts = New-Object System.Collections.Generic.List[string]
     $rightPts = New-Object System.Collections.Generic.List[string]
-    foreach ($item in $densities) {
+    foreach ($item in $active) {
       $yv = [double]$item.Y
       $half = ([double]$item.D / $maxDensity) * $maxHalfWidth
       $py = $plotBottom - $yv * $innerHeight
