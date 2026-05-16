@@ -43,13 +43,20 @@ NUM_STATES="${NUM_STATES:-40}"
 SAMPLES_Y="${SAMPLES_Y:-8}"
 GAMES_Z="${GAMES_Z:-20}"
 BASE_SEED="${BASE_SEED:-20260509}"
+ABLATION_ORIGINAL_VS_UPDATED="${ABLATION_ORIGINAL_VS_UPDATED:-1}"
+ENABLE_PLOTS="${ENABLE_PLOTS:-0}"
 
 CPUS_PER_TASK="${CPUS_PER_TASK:-8}"
 MEM="${MEM:-128G}"
 TIME_LIMIT="${TIME_LIMIT:-36:00:00}"
 SGLANG_MEM_FRACTION="${SGLANG_MEM_FRACTION:-0.85}"
 
-JOB_NAME="${JOB_NAME:-passk-${MODEL_TAG}-nothink-k${NUM_STATES}-y${SAMPLES_Y}-z${GAMES_Z}}"
+JOB_SUFFIX="${JOB_SUFFIX:-k${NUM_STATES}-y${SAMPLES_Y}-z${GAMES_Z}-seed${BASE_SEED}}"
+if [[ "${ABLATION_ORIGINAL_VS_UPDATED}" -eq 1 ]]; then
+  JOB_NAME="${JOB_NAME:-passk-${MODEL_TAG}-nothink-ablate-orig-updated-${JOB_SUFFIX}}"
+else
+  JOB_NAME="${JOB_NAME:-passk-${MODEL_TAG}-nothink-${JOB_SUFFIX}}"
+fi
 LOG_DIR="${REPO_DIR}/logs"
 RUNS_DIR="${REPO_DIR}/single_turn_passk_runs"
 
@@ -140,6 +147,8 @@ submit_array() {
     echo \"Partition/account: ${partition}/${ACCOUNT}\"
     echo \"GPU request: ${gpu_request}\"
     echo \"Shard: \$SHARD_INDEX / ${NUM_SHARDS}\"
+    echo \"Ablation original-vs-updated: ${ABLATION_ORIGINAL_VS_UPDATED}\"
+    echo \"Base seed: ${BASE_SEED}\"
     echo \"Port: \$PORT\"
     echo \"Run dir: \$RUN_DIR\"
 
@@ -181,6 +190,14 @@ submit_array() {
       exit 1
     fi
 
+    EVAL_ARGS=()
+    if [ '${ABLATION_ORIGINAL_VS_UPDATED}' -eq 1 ]; then
+      EVAL_ARGS+=(--ablation-original-vs-updated)
+    fi
+    if [ '${ENABLE_PLOTS}' -ne 1 ]; then
+      EVAL_ARGS+=(--no-plots)
+    fi
+
     '${UV}' run python '${REPO_DIR}/single_turn_passk_eval.py' \
       --env '${ENV_NAME}' \
       --num-states '${NUM_STATES}' \
@@ -193,7 +210,8 @@ submit_array() {
       --num-shards '${NUM_SHARDS}' \
       --shard-index \"\$SHARD_INDEX\" \
       --outputs-dir '${RUNS_DIR}' \
-      --run-name \"\$RUN_NAME\"
+      --run-name \"\$RUN_NAME\" \
+      \"\${EVAL_ARGS[@]}\"
 
     echo \"Done. RUN_DIR=\$RUN_DIR\"
   "

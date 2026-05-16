@@ -7,6 +7,14 @@ results_*.json
 .claude/
 outputs/
 
+# Local analysis/download artifacts.
+latest_y8z20_analysis_extract/
+latest_y8z20_mixed_shards_visualizations/
+y8z20_full_extract/
+y8z20_state_summary_extracted/
+latest_y8z20_analysis_extract.zip
+passk-qwen3-14b-nothink-*.zip
+
 # Large local evaluation artifacts. Keep summaries/plots in Git, but do not
 # track raw LLM call traces because GitHub rejects files over 100 MB.
 pass@k-singleturn_*/**/llm_calls_single_turn_passk_*.jsonl

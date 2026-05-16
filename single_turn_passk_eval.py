@@ -3,6 +3,9 @@ Single-turn pass@k-style evaluation for notebook_minimal.
 
 This workflow freezes each notebook state from a previous notebook_minimal
 run, then evaluates that fixed notebook on fresh randomized grid games.
+With --ablation-original-vs-updated, it also replays the paired updater
+prompt for each state y times, applies sampled notebook edits, and evaluates
+both the original and updated conditions on the same fixed z game instances.
 
 Default experiment shape per environment:
   40 notebook states x 8 independent samples x 20 games per sample.
@@ -17,6 +20,7 @@ Outputs are written under:
     instance_seeds.json
     notebook_states.jsonl
     rollouts.jsonl
+    updater_samples.jsonl     (ablation mode only)
     sample_summary.csv
     state_summary.csv
     llm_calls_single_turn_passk_<env>.jsonl
@@ -45,6 +49,12 @@ from typing import Any
 from common import build_client, call_lm, parse_action_single
 from environments.frozen_lake import FrozenLake
 from environments.sokoban import Sokoban
+from methods.notebook_minimal import (
+    apply_notebook_operations,
+    extract_json_payload,
+    number_lines,
+    validate_operations,
+)
 from prompts import build_notebook_agent_prompt
 
 
@@ -84,6 +94,10 @@ class NotebookState:
     reference_prompt_matches_template: bool
     source_model: str | None
     source_disable_thinking: bool | None
+    updater_source_line: int | None = None
+    updater_prompt: str | None = None
+    updater_prompt_hash: str | None = None
+    updater_prompt_notebook_matches_state: bool | None = None
 
 
 def sha256_text(text: str) -> str:
@@ -135,6 +149,7 @@ def load_notebook_states(
     trace_path: Path,
     env_name: str,
     max_states: int,
+    include_updater_context: bool = False,
 ) -> list[NotebookState]:
     """
     Recover Notebook x for each episode x from a notebook_minimal LM trace.
@@ -152,14 +167,30 @@ def load_notebook_states(
 
     with trace_path.open("r", encoding="utf-8") as handle:
         for line_number, raw_line in enumerate(handle, start=1):
-            if len(states) >= max_states:
+            if (
+                len(states) >= max_states
+                and (
+                    not include_updater_context
+                    or states[-1].updater_prompt is not None
+                )
+            ):
                 break
             if not raw_line.strip():
                 continue
             row = json.loads(raw_line)
             prompt = row.get("prompt", "")
             if is_updater_call(prompt):
+                if states and states[-1].updater_prompt is None:
+                    numbered_notebook = extract_notebook_from_agent_prompt(prompt)
+                    states[-1].updater_source_line = line_number
+                    states[-1].updater_prompt = prompt
+                    states[-1].updater_prompt_hash = sha256_text(prompt)
+                    states[-1].updater_prompt_notebook_matches_state = (
+                        numbered_notebook == number_lines(states[-1].notebook)
+                    )
                 expect_new_episode = True
+                continue
+            if len(states) >= max_states:
                 continue
             if not expect_new_episode or not is_agent_call(prompt):
                 continue
@@ -298,69 +329,224 @@ def run_fixed_notebook_game(
     }
 
 
+def sample_updated_notebook(
+    *,
+    state: NotebookState,
+    client,
+    model: str,
+    disable_thinking: bool,
+    fail_on_empty_lm_output: bool,
+) -> dict:
+    if state.updater_prompt is None:
+        raise ValueError(
+            f"{state.env}: state_x={state.state_x} has no paired updater prompt"
+        )
+
+    lm_output = call_lm(
+        client,
+        model,
+        state.updater_prompt,
+        disable_thinking=disable_thinking,
+    )
+    empty_lm_output = not bool(lm_output.strip())
+    if fail_on_empty_lm_output and empty_lm_output:
+        raise RuntimeError(
+            "LM returned empty output for updater prompt. Check --server/model, "
+            "or pass --allow-empty-lm-output to keep fallback behavior."
+        )
+
+    parse_error = None
+    payload: dict[str, Any] = {"reasoning": "", "operations": []}
+    operations: list[dict] = []
+    if not empty_lm_output:
+        try:
+            payload = extract_json_payload(lm_output)
+            operations = validate_operations(payload.get("operations", []))
+        except Exception as exc:
+            parse_error = str(exc)
+
+    updated_notebook, applied_operations = apply_notebook_operations(
+        state.notebook,
+        operations,
+    )
+    return {
+        "env": state.env,
+        "state_x": state.state_x,
+        "source_notebook_hash": state.notebook_hash,
+        "source_notebook_size_lines": state.notebook_size_lines,
+        "updater_source_line": state.updater_source_line,
+        "updater_prompt_hash": state.updater_prompt_hash,
+        "updater_prompt_notebook_matches_state": (
+            state.updater_prompt_notebook_matches_state
+        ),
+        "lm_output": lm_output,
+        "empty_lm_output": empty_lm_output,
+        "parse_error": parse_error,
+        "reasoning": payload.get("reasoning", ""),
+        "operations": operations,
+        "applied_operations": applied_operations,
+        "num_operations": len(operations),
+        "num_applied_operations": len(applied_operations),
+        "notebook": updated_notebook,
+        "notebook_hash": sha256_text(updated_notebook),
+        "notebook_size_lines": len(updated_notebook.splitlines()),
+        "notebook_changed": updated_notebook != state.notebook,
+    }
+
+
 def summarize_samples(rollouts: list[dict]) -> tuple[list[dict], list[dict]]:
-    by_sample: dict[tuple[str, int, int], list[dict]] = {}
-    by_state: dict[tuple[str, int], list[dict]] = {}
+    include_condition = any("condition" in row for row in rollouts)
+    by_sample: dict[tuple, list[dict]] = {}
+    by_state: dict[tuple, list[dict]] = {}
 
     for row in rollouts:
-        sample_key = (row["env"], row["state_x"], row["sample_y"])
-        state_key = (row["env"], row["state_x"])
+        condition = row.get("condition", "fixed")
+        if include_condition:
+            sample_key = (row["env"], row["state_x"], condition, row["sample_y"])
+            state_key = (row["env"], row["state_x"], condition)
+        else:
+            sample_key = (row["env"], row["state_x"], row["sample_y"])
+            state_key = (row["env"], row["state_x"])
         by_sample.setdefault(sample_key, []).append(row)
         by_state.setdefault(state_key, []).append(row)
 
     sample_rows: list[dict] = []
-    for (env, state_x, sample_y), rows in sorted(by_sample.items()):
+    for key, rows in sorted(by_sample.items()):
+        if include_condition:
+            env, state_x, condition, sample_y = key
+        else:
+            env, state_x, sample_y = key
+            condition = None
         rewards = [float(r["reward"]) for r in rows]
         successes = [1 if r["success"] else 0 for r in rows]
-        sample_rows.append(
+        row_out = {
+            "env": env,
+            "state_x": state_x,
+            "sample_y": sample_y,
+            "num_games": len(rows),
+            "num_success": sum(successes),
+            "pass_rate": sum(successes) / len(rows) if rows else 0.0,
+            "mean_reward": sum(rewards) / len(rewards) if rewards else 0.0,
+            "std_reward": statistics.stdev(rewards) if len(rewards) > 1 else 0.0,
+            "min_reward": min(rewards) if rewards else 0.0,
+            "max_reward": max(rewards) if rewards else 0.0,
+        }
+        if include_condition:
+            row_out["condition"] = condition
+
+        notebook_hashes = sorted(
+            {r["notebook_hash"] for r in rows if "notebook_hash" in r}
+        )
+        if len(notebook_hashes) == 1:
+            row_out["notebook_hash"] = notebook_hashes[0]
+        elif notebook_hashes:
+            row_out["notebook_hash"] = ";".join(notebook_hashes)
+
+        notebook_sizes = [
+            int(r["notebook_size_lines"])
+            for r in rows
+            if "notebook_size_lines" in r
+        ]
+        if notebook_sizes:
+            row_out["notebook_size_lines"] = (
+                notebook_sizes[0]
+                if len(set(notebook_sizes)) == 1
+                else sum(notebook_sizes) / len(notebook_sizes)
+            )
+
+        source_hashes = sorted(
             {
-                "env": env,
-                "state_x": state_x,
-                "sample_y": sample_y,
-                "num_games": len(rows),
-                "num_success": sum(successes),
-                "pass_rate": sum(successes) / len(rows) if rows else 0.0,
-                "mean_reward": sum(rewards) / len(rewards) if rewards else 0.0,
-                "std_reward": statistics.stdev(rewards) if len(rewards) > 1 else 0.0,
-                "min_reward": min(rewards) if rewards else 0.0,
-                "max_reward": max(rewards) if rewards else 0.0,
+                r["source_notebook_hash"]
+                for r in rows
+                if "source_notebook_hash" in r
             }
         )
+        if len(source_hashes) == 1:
+            row_out["source_notebook_hash"] = source_hashes[0]
 
-    sample_rates_by_state: dict[tuple[str, int], list[float]] = {}
+        sample_rows.append(row_out)
+
+    sample_rates_by_state: dict[tuple, list[float]] = {}
     for row in sample_rows:
-        key = (row["env"], row["state_x"])
+        key = (
+            (row["env"], row["state_x"], row["condition"])
+            if include_condition
+            else (row["env"], row["state_x"])
+        )
         sample_rates_by_state.setdefault(key, []).append(float(row["pass_rate"]))
 
     state_rows: list[dict] = []
-    for (env, state_x), rows in sorted(by_state.items()):
+    for key, rows in sorted(by_state.items()):
+        if include_condition:
+            env, state_x, condition = key
+        else:
+            env, state_x = key
+            condition = None
         successes = [1 if r["success"] else 0 for r in rows]
-        sample_rates = sample_rates_by_state.get((env, state_x), [])
+        sample_key = (
+            (env, state_x, condition)
+            if include_condition
+            else (env, state_x)
+        )
+        sample_rates = sample_rates_by_state.get(sample_key, [])
         mean_sample_pass = (
             sum(sample_rates) / len(sample_rates) if sample_rates else 0.0
         )
         std_sample_pass = (
             statistics.stdev(sample_rates) if len(sample_rates) > 1 else 0.0
         )
-        state_rows.append(
+        row_out = {
+            "env": env,
+            "state_x": state_x,
+            "num_samples": len(sample_rates),
+            "total_games": len(rows),
+            "total_success": sum(successes),
+            "overall_pass_rate": sum(successes) / len(rows) if rows else 0.0,
+            "mean_sample_pass_rate": mean_sample_pass,
+            "std_sample_pass_rate": std_sample_pass,
+            "sem_sample_pass_rate": (
+                std_sample_pass / math.sqrt(len(sample_rates))
+                if sample_rates
+                else 0.0
+            ),
+            "min_sample_pass_rate": min(sample_rates) if sample_rates else 0.0,
+            "max_sample_pass_rate": max(sample_rates) if sample_rates else 0.0,
+        }
+        if include_condition:
+            row_out["condition"] = condition
+
+        notebook_hashes = sorted(
+            {r["notebook_hash"] for r in rows if "notebook_hash" in r}
+        )
+        if notebook_hashes:
+            row_out["num_unique_notebook_hashes"] = len(notebook_hashes)
+            row_out["notebook_hash"] = (
+                notebook_hashes[0]
+                if len(notebook_hashes) == 1
+                else ";".join(notebook_hashes)
+            )
+
+        notebook_sizes = [
+            int(r["notebook_size_lines"])
+            for r in rows
+            if "notebook_size_lines" in r
+        ]
+        if notebook_sizes:
+            row_out["notebook_size_lines"] = sum(notebook_sizes) / len(notebook_sizes)
+            row_out["min_notebook_size_lines"] = min(notebook_sizes)
+            row_out["max_notebook_size_lines"] = max(notebook_sizes)
+
+        source_hashes = sorted(
             {
-                "env": env,
-                "state_x": state_x,
-                "num_samples": len(sample_rates),
-                "total_games": len(rows),
-                "total_success": sum(successes),
-                "overall_pass_rate": sum(successes) / len(rows) if rows else 0.0,
-                "mean_sample_pass_rate": mean_sample_pass,
-                "std_sample_pass_rate": std_sample_pass,
-                "sem_sample_pass_rate": (
-                    std_sample_pass / math.sqrt(len(sample_rates))
-                    if sample_rates
-                    else 0.0
-                ),
-                "min_sample_pass_rate": min(sample_rates) if sample_rates else 0.0,
-                "max_sample_pass_rate": max(sample_rates) if sample_rates else 0.0,
+                r["source_notebook_hash"]
+                for r in rows
+                if "source_notebook_hash" in r
             }
         )
+        if len(source_hashes) == 1:
+            row_out["source_notebook_hash"] = source_hashes[0]
+
+        state_rows.append(row_out)
     return sample_rows, state_rows
 
 
@@ -377,10 +563,15 @@ def attach_notebook_metadata(
     for row in rows:
         out = dict(row)
         state = state_lookup[(row["env"], row["state_x"])]
-        out["notebook_hash"] = state.notebook_hash
-        out["notebook_size_lines"] = state.notebook_size_lines
+        out.setdefault("notebook_hash", state.notebook_hash)
+        out.setdefault("notebook_size_lines", state.notebook_size_lines)
+        out["source_notebook_hash"] = state.notebook_hash
+        out["source_notebook_size_lines"] = state.notebook_size_lines
         out["reference_prompt_matches_template"] = (
             state.reference_prompt_matches_template
+        )
+        out["updater_prompt_notebook_matches_state"] = (
+            state.updater_prompt_notebook_matches_state
         )
         enriched.append(out)
     return enriched
@@ -483,7 +674,7 @@ def generate_visualizations(
     for env in envs:
         rows = rows_for(env)
         xs = [int(r["state_x"]) for r in rows]
-        ys = [int(r["notebook_size_lines"]) for r in rows]
+        ys = [float(r["notebook_size_lines"]) for r in rows]
         plt.plot(xs, ys, marker="o", linewidth=1.5, label=env)
     plt.xlabel("Notebook state x")
     plt.ylabel("Notebook lines")
@@ -550,6 +741,7 @@ def run_eval(args) -> Path:
             trace_path=trace_path,
             env_name=env_name,
             max_states=args.num_states,
+            include_updater_context=args.ablation_original_vs_updated,
         )
         if len(states) < args.num_states:
             print(
@@ -580,6 +772,40 @@ def run_eval(args) -> Path:
             f"build_notebook_agent_prompt. Examples: {examples}. "
             "Pass --allow-prompt-mismatch to continue anyway."
         )
+
+    if args.ablation_original_vs_updated:
+        missing_updaters = [
+            state
+            for states in states_by_env.values()
+            for state in states
+            if state.updater_prompt is None
+        ]
+        if missing_updaters:
+            examples = ", ".join(
+                f"{state.env}:x={state.state_x}:line={state.source_line}"
+                for state in missing_updaters[:5]
+            )
+            raise ValueError(
+                "Ablation mode requires a paired updater prompt for every "
+                f"selected state. Missing examples: {examples}."
+            )
+
+        updater_prompt_mismatches = [
+            state
+            for states in states_by_env.values()
+            for state in states
+            if not state.updater_prompt_notebook_matches_state
+        ]
+        if updater_prompt_mismatches and not args.allow_prompt_mismatch:
+            examples = ", ".join(
+                f"{state.env}:x={state.state_x}:updater_line={state.updater_source_line}"
+                for state in updater_prompt_mismatches[:5]
+            )
+            raise ValueError(
+                "Updater prompts do not contain the same line-numbered "
+                f"notebook as the paired state. Examples: {examples}. "
+                "Pass --allow-prompt-mismatch to continue anyway."
+            )
 
     source_models = sorted(
         {
@@ -625,10 +851,22 @@ def run_eval(args) -> Path:
         },
         "samples_y": args.samples_y,
         "games_z": args.games_z,
+        "ablation_original_vs_updated": args.ablation_original_vs_updated,
+        "conditions": (
+            ["original", "updated"]
+            if args.ablation_original_vs_updated
+            else ["fixed"]
+        ),
         "total_rollouts_planned": (
             sum(len(v) for v in states_by_env.values())
             * args.samples_y
             * args.games_z
+            * (2 if args.ablation_original_vs_updated else 1)
+        ),
+        "total_updater_samples_planned": (
+            sum(len(v) for v in states_by_env.values()) * args.samples_y
+            if args.ablation_original_vs_updated
+            else 0
         ),
         "base_seed": args.base_seed,
         "seed_formula": (
@@ -678,8 +916,19 @@ def run_eval(args) -> Path:
     rollouts_path = run_dir / "rollouts.jsonl"
 
     with rollouts_path.open("w", encoding="utf-8") as rollouts_handle:
+        updater_handle = None
+        if args.ablation_original_vs_updated:
+            updater_handle = (run_dir / "updater_samples.jsonl").open(
+                "w",
+                encoding="utf-8",
+            )
         for env_name in env_names:
-            lm_trace_path = run_dir / f"llm_calls_single_turn_passk_{env_name}.jsonl"
+            trace_name = (
+                f"llm_calls_single_turn_passk_ablation_{env_name}.jsonl"
+                if args.ablation_original_vs_updated
+                else f"llm_calls_single_turn_passk_{env_name}.jsonl"
+            )
+            lm_trace_path = run_dir / trace_name
             os.environ["LLM_TRACE_PATH"] = str(lm_trace_path)
             print(f"[{env_name}] LM traces -> {lm_trace_path}")
 
@@ -690,38 +939,114 @@ def run_eval(args) -> Path:
                     f"notebook_lines={state.notebook_size_lines}"
                 )
                 for sample_y in range(1, args.samples_y + 1):
+                    if args.ablation_original_vs_updated:
+                        updater_sample = sample_updated_notebook(
+                            state=state,
+                            client=client,
+                            model=model,
+                            disable_thinking=disable_thinking,
+                            fail_on_empty_lm_output=(
+                                not args.allow_empty_lm_output
+                            ),
+                        )
+                        updater_sample["sample_y"] = sample_y
+                        updater_sample["model"] = model
+                        updater_sample["disable_thinking"] = disable_thinking
+                        if updater_handle is None:
+                            raise RuntimeError("updater handle was not opened")
+                        append_jsonl(updater_handle, updater_sample)
+                    else:
+                        updater_sample = None
+
                     for game_z in range(1, args.games_z + 1):
                         seed = rollout_seed(
                             instance_seed_bank,
                             env_name,
                             game_z,
                         )
-                        game = run_fixed_notebook_game(
-                            env_name=env_name,
-                            seed=seed,
-                            notebook=state.notebook,
-                            client=client,
-                            model=model,
-                            disable_thinking=disable_thinking,
-                            reward_threshold=args.reward_threshold,
-                            fail_on_empty_lm_output=(
-                                not args.allow_empty_lm_output
-                            ),
-                        )
-                        row = {
-                            "env": env_name,
-                            "state_x": state.state_x,
-                            "sample_y": sample_y,
-                            "game_z": game_z,
-                            "seed": seed,
-                            "notebook_hash": state.notebook_hash,
-                            "notebook_size_lines": state.notebook_size_lines,
-                            "model": model,
-                            "disable_thinking": disable_thinking,
-                            **game,
-                        }
-                        all_rollouts.append(row)
-                        append_jsonl(rollouts_handle, row)
+                        eval_notebooks = [
+                            (
+                                "original"
+                                if args.ablation_original_vs_updated
+                                else "fixed",
+                                state.notebook,
+                                state.notebook_hash,
+                                state.notebook_size_lines,
+                                {},
+                            )
+                        ]
+                        if updater_sample is not None:
+                            eval_notebooks.append(
+                                (
+                                    "updated",
+                                    updater_sample["notebook"],
+                                    updater_sample["notebook_hash"],
+                                    updater_sample["notebook_size_lines"],
+                                    {
+                                        "updater_sample_y": sample_y,
+                                        "updater_prompt_hash": (
+                                            updater_sample["updater_prompt_hash"]
+                                        ),
+                                        "updater_num_operations": (
+                                            updater_sample["num_operations"]
+                                        ),
+                                        "updater_num_applied_operations": (
+                                            updater_sample[
+                                                "num_applied_operations"
+                                            ]
+                                        ),
+                                        "updater_parse_error": (
+                                            updater_sample["parse_error"]
+                                        ),
+                                        "updater_notebook_changed": (
+                                            updater_sample["notebook_changed"]
+                                        ),
+                                    },
+                                )
+                            )
+
+                        for (
+                            condition,
+                            notebook,
+                            notebook_hash,
+                            notebook_size_lines,
+                            extra_fields,
+                        ) in eval_notebooks:
+                            game = run_fixed_notebook_game(
+                                env_name=env_name,
+                                seed=seed,
+                                notebook=notebook,
+                                client=client,
+                                model=model,
+                                disable_thinking=disable_thinking,
+                                reward_threshold=args.reward_threshold,
+                                fail_on_empty_lm_output=(
+                                    not args.allow_empty_lm_output
+                                ),
+                            )
+                            row = {
+                                "env": env_name,
+                                "state_x": state.state_x,
+                                "condition": condition,
+                                "sample_y": sample_y,
+                                "game_z": game_z,
+                                "seed": seed,
+                                "notebook_hash": notebook_hash,
+                                "notebook_size_lines": notebook_size_lines,
+                                "source_notebook_hash": state.notebook_hash,
+                                "source_notebook_size_lines": (
+                                    state.notebook_size_lines
+                                ),
+                                "model": model,
+                                "disable_thinking": disable_thinking,
+                                **extra_fields,
+                                **game,
+                            }
+                            all_rollouts.append(row)
+                            append_jsonl(rollouts_handle, row)
+
+        if updater_handle is not None:
+            updater_handle.close()
 
     sample_rows, state_rows = summarize_samples(all_rollouts)
     sample_rows = attach_notebook_metadata(sample_rows, states_by_env)
@@ -797,6 +1122,15 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=8,
         help="Independent sample batches per notebook state (default: 8).",
+    )
+    parser.add_argument(
+        "--ablation-original-vs-updated",
+        action="store_true",
+        help=(
+            "For each notebook state, compare y repeated original-notebook "
+            "eval batches against y sampled updater edits evaluated on the "
+            "same z fixed instances."
+        ),
     )
     parser.add_argument(
         "--games-z",
