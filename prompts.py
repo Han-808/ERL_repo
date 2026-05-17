@@ -117,6 +117,7 @@ def build_notebook_updater_prompt(
     feedback: str,
     reward: int,
     reward_threshold: float,
+    updater_objective: str | None = None,
 ) -> str:
     """
     Post-episode updater prompt for notebook_minimal.
@@ -126,6 +127,11 @@ def build_notebook_updater_prompt(
     with replace / insert_after / delete ops over original line numbers.
     """
     outcome = "SUCCESS" if reward >= reward_threshold else "FAILURE"
+    objective_block = (
+        f"\n**Updater objective:**\n{updater_objective.strip()}\n"
+        if updater_objective
+        else ""
+    )
     return f"""You are a notebook updater for an agent playing a grid puzzle.
 Review the episode below and edit the notebook with insights that will
 improve the agent's future success rate.
@@ -152,6 +158,7 @@ Current notebook (line-numbered):
 <<<NOTEBOOK>>>
 {numbered_notebook}
 <<<END_NOTEBOOK>>>
+{objective_block}
 
 **Editing guidelines:**
 - Replace when an existing note is wrong or superseded.

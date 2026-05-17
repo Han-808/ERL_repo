@@ -55,6 +55,8 @@ from methods.notebook_minimal import (
     number_lines,
     validate_operations,
 )
+from methods.notebook_minimal_mechanism import MECHANISM_UPDATER_OBJECTIVE
+from methods.notebook_minimal_thinkahead import THINKAHEAD_UPDATER_OBJECTIVE
 from prompts import build_notebook_agent_prompt
 
 
@@ -76,6 +78,13 @@ ENV_CLASSES = {
 ENV_SEED_OFFSETS = {
     "frozen_lake": 0,
     "sokoban": 500_000_000,
+}
+
+UPDATER_OBJECTIVES = {
+    "baseline": None,
+    "none": None,
+    "thinkahead": THINKAHEAD_UPDATER_OBJECTIVE,
+    "mechanism": MECHANISM_UPDATER_OBJECTIVE,
 }
 
 
@@ -336,16 +345,23 @@ def sample_updated_notebook(
     model: str,
     disable_thinking: bool,
     fail_on_empty_lm_output: bool,
+    updater_objective_variant: str,
+    updater_objective: str | None,
 ) -> dict:
     if state.updater_prompt is None:
         raise ValueError(
             f"{state.env}: state_x={state.state_x} has no paired updater prompt"
         )
 
+    updater_prompt = apply_updater_objective(
+        state.updater_prompt,
+        updater_objective,
+    )
+
     lm_output = call_lm(
         client,
         model,
-        state.updater_prompt,
+        updater_prompt,
         disable_thinking=disable_thinking,
     )
     empty_lm_output = not bool(lm_output.strip())
@@ -375,7 +391,12 @@ def sample_updated_notebook(
         "source_notebook_hash": state.notebook_hash,
         "source_notebook_size_lines": state.notebook_size_lines,
         "updater_source_line": state.updater_source_line,
-        "updater_prompt_hash": state.updater_prompt_hash,
+        "source_updater_prompt_hash": state.updater_prompt_hash,
+        "updater_prompt_hash": sha256_text(updater_prompt),
+        "updater_objective_variant": updater_objective_variant,
+        "updater_objective_hash": (
+            sha256_text(updater_objective) if updater_objective else None
+        ),
         "updater_prompt_notebook_matches_state": (
             state.updater_prompt_notebook_matches_state
         ),
@@ -392,6 +413,19 @@ def sample_updated_notebook(
         "notebook_size_lines": len(updated_notebook.splitlines()),
         "notebook_changed": updated_notebook != state.notebook,
     }
+
+
+def apply_updater_objective(prompt: str, objective: str | None) -> str:
+    """Insert a variant objective into a stored baseline updater prompt."""
+    if not objective:
+        return prompt
+    if "**Updater objective:**" in prompt:
+        return prompt
+    marker = "\n\n**Editing guidelines:**"
+    if marker not in prompt:
+        raise ValueError("updater prompt does not contain editing guidelines marker")
+    block = f"\n\n**Updater objective:**\n{objective.strip()}\n"
+    return prompt.replace(marker, f"{block}{marker}", 1)
 
 
 def summarize_samples(rollouts: list[dict]) -> tuple[list[dict], list[dict]]:
@@ -836,6 +870,7 @@ def run_eval(args) -> Path:
         env_names,
         args.games_z,
     )
+    updater_objective = UPDATER_OBJECTIVES[args.updater_objective_variant]
 
     config = {
         "env": args.env,
@@ -852,6 +887,11 @@ def run_eval(args) -> Path:
         "samples_y": args.samples_y,
         "games_z": args.games_z,
         "ablation_original_vs_updated": args.ablation_original_vs_updated,
+        "updater_objective_variant": args.updater_objective_variant,
+        "updater_objective": updater_objective,
+        "updater_objective_hash": (
+            sha256_text(updater_objective) if updater_objective else None
+        ),
         "conditions": (
             ["original", "updated"]
             if args.ablation_original_vs_updated
@@ -948,6 +988,10 @@ def run_eval(args) -> Path:
                             fail_on_empty_lm_output=(
                                 not args.allow_empty_lm_output
                             ),
+                            updater_objective_variant=(
+                                args.updater_objective_variant
+                            ),
+                            updater_objective=updater_objective,
                         )
                         updater_sample["sample_y"] = sample_y
                         updater_sample["model"] = model
@@ -986,6 +1030,21 @@ def run_eval(args) -> Path:
                                         "updater_sample_y": sample_y,
                                         "updater_prompt_hash": (
                                             updater_sample["updater_prompt_hash"]
+                                        ),
+                                        "source_updater_prompt_hash": (
+                                            updater_sample[
+                                                "source_updater_prompt_hash"
+                                            ]
+                                        ),
+                                        "updater_objective_variant": (
+                                            updater_sample[
+                                                "updater_objective_variant"
+                                            ]
+                                        ),
+                                        "updater_objective_hash": (
+                                            updater_sample[
+                                                "updater_objective_hash"
+                                            ]
                                         ),
                                         "updater_num_operations": (
                                             updater_sample["num_operations"]
@@ -1130,6 +1189,16 @@ def build_parser() -> argparse.ArgumentParser:
             "For each notebook state, compare y repeated original-notebook "
             "eval batches against y sampled updater edits evaluated on the "
             "same z fixed instances."
+        ),
+    )
+    parser.add_argument(
+        "--updater-objective-variant",
+        choices=sorted(UPDATER_OBJECTIVES),
+        default="baseline",
+        help=(
+            "Optional updater objective inserted into paired baseline updater "
+            "prompts before sampling updated notebooks. Used only with "
+            "--ablation-original-vs-updated."
         ),
     )
     parser.add_argument(

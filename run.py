@@ -25,6 +25,8 @@ from environments.sokoban import Sokoban
 from methods.ace import ACEMethod
 from methods.erl import ERLMethod
 from methods.notebook_minimal import NotebookMinimalMethod
+from methods.notebook_minimal_mechanism import NotebookMinimalMechanismMethod
+from methods.notebook_minimal_thinkahead import NotebookMinimalThinkAheadMethod
 
 
 def _notebook_factory(initial_notebook):
@@ -46,6 +48,10 @@ METHODS = {
                                "notebook_size", "Notebook Lines"),
     "notebook_minimal_default": (_notebook_factory("default"),
                                  "notebook_size", "Notebook Lines"),
+    "notebook_minimal_mechanism": (NotebookMinimalMechanismMethod,
+                                   "notebook_size", "Notebook Lines"),
+    "notebook_minimal_thinkahead": (NotebookMinimalThinkAheadMethod,
+                                    "notebook_size", "Notebook Lines"),
 }
 
 

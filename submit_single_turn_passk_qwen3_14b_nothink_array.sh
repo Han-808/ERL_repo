@@ -44,6 +44,7 @@ SAMPLES_Y="${SAMPLES_Y:-8}"
 GAMES_Z="${GAMES_Z:-20}"
 BASE_SEED="${BASE_SEED:-20260509}"
 ABLATION_ORIGINAL_VS_UPDATED="${ABLATION_ORIGINAL_VS_UPDATED:-1}"
+UPDATER_OBJECTIVE_VARIANT="${UPDATER_OBJECTIVE_VARIANT:-baseline}"
 ENABLE_PLOTS="${ENABLE_PLOTS:-0}"
 
 CPUS_PER_TASK="${CPUS_PER_TASK:-8}"
@@ -148,6 +149,7 @@ submit_array() {
     echo \"GPU request: ${gpu_request}\"
     echo \"Shard: \$SHARD_INDEX / ${NUM_SHARDS}\"
     echo \"Ablation original-vs-updated: ${ABLATION_ORIGINAL_VS_UPDATED}\"
+    echo \"Updater objective variant: ${UPDATER_OBJECTIVE_VARIANT}\"
     echo \"Base seed: ${BASE_SEED}\"
     echo \"Port: \$PORT\"
     echo \"Run dir: \$RUN_DIR\"
@@ -193,6 +195,7 @@ submit_array() {
     EVAL_ARGS=()
     if [ '${ABLATION_ORIGINAL_VS_UPDATED}' -eq 1 ]; then
       EVAL_ARGS+=(--ablation-original-vs-updated)
+      EVAL_ARGS+=(--updater-objective-variant '${UPDATER_OBJECTIVE_VARIANT}')
     fi
     if [ '${ENABLE_PLOTS}' -ne 1 ]; then
       EVAL_ARGS+=(--no-plots)
