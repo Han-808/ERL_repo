@@ -46,6 +46,8 @@ BASE_SEED="${BASE_SEED:-20260509}"
 ABLATION_ORIGINAL_VS_UPDATED="${ABLATION_ORIGINAL_VS_UPDATED:-1}"
 UPDATER_OBJECTIVE_VARIANT="${UPDATER_OBJECTIVE_VARIANT:-baseline}"
 ENABLE_PLOTS="${ENABLE_PLOTS:-0}"
+FROZEN_LAKE_TRACE="${FROZEN_LAKE_TRACE:-}"
+SOKOBAN_TRACE="${SOKOBAN_TRACE:-}"
 
 CPUS_PER_TASK="${CPUS_PER_TASK:-8}"
 MEM="${MEM:-128G}"
@@ -72,8 +74,16 @@ mkdir -p "${LOG_DIR}" "${RUNS_DIR}"
 
 echo "Preflight:"
 test -f "${REPO_DIR}/single_turn_passk_eval.py"
-test -f "${REPO_DIR}/llm_calls_notebook_minimal_frozen_lake.jsonl"
-test -f "${REPO_DIR}/llm_calls_notebook_minimal_sokoban.jsonl"
+if [[ -n "${FROZEN_LAKE_TRACE}" ]]; then
+  test -f "${FROZEN_LAKE_TRACE}"
+else
+  test -f "${REPO_DIR}/llm_calls_notebook_minimal_frozen_lake.jsonl"
+fi
+if [[ -n "${SOKOBAN_TRACE}" ]]; then
+  test -f "${SOKOBAN_TRACE}"
+else
+  test -f "${REPO_DIR}/llm_calls_notebook_minimal_sokoban.jsonl"
+fi
 test -x "${UV}"
 test -x "${SGLANG}"
 
@@ -199,6 +209,12 @@ submit_array() {
     fi
     if [ '${ENABLE_PLOTS}' -ne 1 ]; then
       EVAL_ARGS+=(--no-plots)
+    fi
+    if [ -n '${FROZEN_LAKE_TRACE}' ]; then
+      EVAL_ARGS+=(--frozen-lake-trace '${FROZEN_LAKE_TRACE}')
+    fi
+    if [ -n '${SOKOBAN_TRACE}' ]; then
+      EVAL_ARGS+=(--sokoban-trace '${SOKOBAN_TRACE}')
     fi
 
     '${UV}' run python '${REPO_DIR}/single_turn_passk_eval.py' \
