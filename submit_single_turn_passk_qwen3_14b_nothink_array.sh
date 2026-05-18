@@ -18,6 +18,8 @@ UV="${UV:-/gscratch/stf/mohanc3/uv-env/uv-bin/uv}"
 SGLANG="${SGLANG:-/mmfs1/gscratch/stf/mohanc3/.conda/envs/sglang311/bin/sglang}"
 
 ACCOUNT="${ACCOUNT:-h2lab}"
+A100_PARTITION="${A100_PARTITION:-gpu-a100}"
+A100_GPU_REQUEST="${A100_GPU_REQUEST:-a100:1}"
 L40_PARTITION="${L40_PARTITION:-gpu-l40}"
 L40_GPU_REQUEST="${L40_GPU_REQUEST:-l40:1}"
 L40S_PARTITION="${L40S_PARTITION:-gpu-l40s}"
@@ -25,14 +27,16 @@ L40S_GPU_REQUEST="${L40S_GPU_REQUEST:-l40s:1}"
 
 # Use eight independent one-GPU shards by default: 4 on L40 and 4 on L40S.
 # Override the per-GPU-type counts/concurrency at submit time if needed.
+A100_SHARDS="${A100_SHARDS:-0}"
 L40_SHARDS="${L40_SHARDS:-4}"
 L40S_SHARDS="${L40S_SHARDS:-4}"
+A100_ARRAY_MAX_CONCURRENT="${A100_ARRAY_MAX_CONCURRENT:-${A100_SHARDS}}"
 L40_ARRAY_MAX_CONCURRENT="${L40_ARRAY_MAX_CONCURRENT:-${L40_SHARDS}}"
 L40S_ARRAY_MAX_CONCURRENT="${L40S_ARRAY_MAX_CONCURRENT:-${L40S_SHARDS}}"
-EXPECTED_NUM_SHARDS=$((L40_SHARDS + L40S_SHARDS))
+EXPECTED_NUM_SHARDS=$((A100_SHARDS + L40_SHARDS + L40S_SHARDS))
 NUM_SHARDS="${NUM_SHARDS:-${EXPECTED_NUM_SHARDS}}"
 if [[ "${NUM_SHARDS}" -ne "${EXPECTED_NUM_SHARDS}" ]]; then
-  echo "ERROR: NUM_SHARDS (${NUM_SHARDS}) must equal L40_SHARDS + L40S_SHARDS (${EXPECTED_NUM_SHARDS})." >&2
+  echo "ERROR: NUM_SHARDS (${NUM_SHARDS}) must equal A100_SHARDS + L40_SHARDS + L40S_SHARDS (${EXPECTED_NUM_SHARDS})." >&2
   exit 1
 fi
 
@@ -245,10 +249,27 @@ submit_array() {
   fi
 }
 
-L40_ARRAY_SPEC="0-$((L40_SHARDS - 1))%${L40_ARRAY_MAX_CONCURRENT}"
-L40S_ARRAY_START="${L40_SHARDS}"
-L40S_ARRAY_END="$((NUM_SHARDS - 1))"
-L40S_ARRAY_SPEC="${L40S_ARRAY_START}-${L40S_ARRAY_END}%${L40S_ARRAY_MAX_CONCURRENT}"
+submit_group() {
+  local label="$1"
+  local count="$2"
+  local max_concurrent="$3"
+  local start="$4"
+  local partition="$5"
+  local gpu_request="$6"
 
-submit_array "l40" "${L40_ARRAY_SPEC}" "${L40_PARTITION}" "${L40_GPU_REQUEST}"
-submit_array "l40s" "${L40S_ARRAY_SPEC}" "${L40S_PARTITION}" "${L40S_GPU_REQUEST}"
+  if [[ "${count}" -le 0 ]]; then
+    return 0
+  fi
+  local end=$((start + count - 1))
+  local array_spec="${start}-${end}%${max_concurrent}"
+  submit_array "${label}" "${array_spec}" "${partition}" "${gpu_request}"
+}
+
+NEXT_SHARD=0
+submit_group "a100" "${A100_SHARDS}" "${A100_ARRAY_MAX_CONCURRENT}" "${NEXT_SHARD}" "${A100_PARTITION}" "${A100_GPU_REQUEST}"
+NEXT_SHARD=$((NEXT_SHARD + A100_SHARDS))
+
+submit_group "l40" "${L40_SHARDS}" "${L40_ARRAY_MAX_CONCURRENT}" "${NEXT_SHARD}" "${L40_PARTITION}" "${L40_GPU_REQUEST}"
+NEXT_SHARD=$((NEXT_SHARD + L40_SHARDS))
+
+submit_group "l40s" "${L40S_SHARDS}" "${L40S_ARRAY_MAX_CONCURRENT}" "${NEXT_SHARD}" "${L40S_PARTITION}" "${L40S_GPU_REQUEST}"
