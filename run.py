@@ -23,6 +23,7 @@ from common import print_episode_table, results_path, write_results
 from environments.frozen_lake import FrozenLake
 from environments.sokoban import Sokoban
 from methods.ace import ACEMethod
+from methods.ace_once import ACEOnceMethod
 from methods.erl import ERLMethod
 from methods.notebook_minimal import NotebookMinimalMethod
 from methods.notebook_minimal_mechanism import NotebookMinimalMechanismMethod
@@ -42,6 +43,7 @@ def _notebook_factory(initial_notebook):
 METHODS = {
     "erl":                    (ERLMethod, "memory_size", "Memory Size"),
     "ace":                    (ACEMethod, "playbook_size", "Playbook Size"),
+    "ace_once":               (ACEOnceMethod, "playbook_size", "Playbook Size"),
     "notebook_minimal":       (_notebook_factory("empty"),
                                "notebook_size", "Notebook Lines"),
     "notebook_minimal_empty": (_notebook_factory("empty"),

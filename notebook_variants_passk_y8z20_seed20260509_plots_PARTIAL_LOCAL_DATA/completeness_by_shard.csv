@@ -1,0 +1,17 @@
+source,variant,shard,actual_rollouts,planned_rollouts,complete
+origlogs,mechanism,passk-qwen3-14b-nothink-origlogs-mechanism-k40-y8-z20-seed20260509-35327027-shard0,5910,6400,False
+origlogs,mechanism,passk-qwen3-14b-nothink-origlogs-mechanism-k40-y8-z20-seed20260509-35327027-shard1,5911,6400,False
+origlogs,mechanism,passk-qwen3-14b-nothink-origlogs-mechanism-k40-y8-z20-seed20260509-35327028-shard2,5914,6400,False
+origlogs,mechanism,passk-qwen3-14b-nothink-origlogs-mechanism-k40-y8-z20-seed20260509-35327028-shard3,5847,6400,False
+origlogs,thinkahead,passk-qwen3-14b-nothink-origlogs-thinkahead-k40-y8-z20-seed20260509-35327025-shard0,5870,6400,False
+origlogs,thinkahead,passk-qwen3-14b-nothink-origlogs-thinkahead-k40-y8-z20-seed20260509-35327025-shard1,5910,6400,False
+origlogs,thinkahead,passk-qwen3-14b-nothink-origlogs-thinkahead-k40-y8-z20-seed20260509-35327026-shard3,5829,6400,False
+origlogs,thinkahead,passk-qwen3-14b-nothink-origlogs-thinkahead-k40-y8-z20-seed20260509-retry-shard2-35327197-shard2,5903,6400,False
+ownlogs,mechanism,passk-qwen3-14b-nothink-ownlogs-mechanism-k40-y8-z20-seed20260509-35331047-shard0,6400,6400,True
+ownlogs,mechanism,passk-qwen3-14b-nothink-ownlogs-mechanism-k40-y8-z20-seed20260509-35331047-shard1,6400,6400,True
+ownlogs,mechanism,passk-qwen3-14b-nothink-ownlogs-mechanism-k40-y8-z20-seed20260509-35331048-shard2,4585,6400,False
+ownlogs,mechanism,passk-qwen3-14b-nothink-ownlogs-mechanism-k40-y8-z20-seed20260509-35331048-shard3,4863,6400,False
+ownlogs,thinkahead,passk-qwen3-14b-nothink-ownlogs-thinkahead-k40-y8-z20-seed20260509-35331045-shard0,6400,6400,True
+ownlogs,thinkahead,passk-qwen3-14b-nothink-ownlogs-thinkahead-k40-y8-z20-seed20260509-35331045-shard1,6400,6400,True
+ownlogs,thinkahead,passk-qwen3-14b-nothink-ownlogs-thinkahead-k40-y8-z20-seed20260509-35331046-shard2,3813,6400,False
+ownlogs,thinkahead,passk-qwen3-14b-nothink-ownlogs-thinkahead-k40-y8-z20-seed20260509-35331046-shard3,4172,6400,False

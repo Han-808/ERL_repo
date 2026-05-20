@@ -1,0 +1,122 @@
+{
+  "env": "both",
+  "envs": [
+    "frozen_lake",
+    "sokoban"
+  ],
+  "num_states_requested": 40,
+  "state_start": null,
+  "state_end": null,
+  "num_shards": 4,
+  "shard_index": 3,
+  "selected_states": {
+    "frozen_lake": [
+      4,
+      8,
+      12,
+      16,
+      20,
+      24,
+      28,
+      32,
+      36,
+      40
+    ],
+    "sokoban": [
+      4,
+      8,
+      12,
+      16,
+      20,
+      24,
+      28,
+      32,
+      36,
+      40
+    ]
+  },
+  "samples_y": 8,
+  "games_z": 20,
+  "ablation_original_vs_updated": true,
+  "updater_objective_variant": "mechanism",
+  "updater_objective": "The notebook updater should prioritize learning reusable environment mechanics:\nwhat actions are allowed, what blocks movement, what causes terminal\nsuccess/failure, what objects can be moved, and what preconditions make an\naction effective.\n",
+  "updater_objective_hash": "b1217a35f21b4e54212e9e6787168293901ae934c50dfddae936664087a1877d",
+  "conditions": [
+    "original",
+    "updated"
+  ],
+  "total_rollouts_planned": 6400,
+  "total_updater_samples_planned": 160,
+  "base_seed": 20260509,
+  "seed_formula": "For each env, generate games_z seeds with random.Random(base_seed + env_offset). The selected seed is instance_seeds[env][game_z-1] and is shared across all state_x/sample_y pairs.",
+  "instance_seed_policy": "shared_across_state_x_and_sample_y",
+  "instance_seeds": {
+    "frozen_lake": [
+      1606499246,
+      120270093,
+      1877713643,
+      1092866017,
+      2048771876,
+      1919773472,
+      978714720,
+      414828891,
+      842932571,
+      2065330543,
+      1474373269,
+      965037496,
+      34515094,
+      1580031779,
+      1005208018,
+      1443012418,
+      244219459,
+      126722185,
+      1350375000,
+      1131957490
+    ],
+    "sokoban": [
+      724722700,
+      674699663,
+      1518062159,
+      399909356,
+      605366451,
+      1389010016,
+      2127076477,
+      969988225,
+      1657254611,
+      673198875,
+      529031391,
+      1268384826,
+      792393184,
+      220732798,
+      1941422163,
+      2099525965,
+      1853359861,
+      2008148574,
+      2069705189,
+      648802569
+    ]
+  },
+  "reward_threshold": 1.0,
+  "model": "Qwen/Qwen3-14B",
+  "server": "http://127.0.0.1:30003/v1",
+  "disable_thinking": true,
+  "call_lm_settings": {
+    "max_tokens": 512,
+    "temperature": 0.7
+  },
+  "fail_on_empty_lm_output": true,
+  "allow_prompt_mismatch": false,
+  "trace_paths": {
+    "frozen_lake": "llm_calls_notebook_minimal_frozen_lake.jsonl",
+    "sokoban": "llm_calls_notebook_minimal_sokoban.jsonl"
+  },
+  "source_models": [
+    "Qwen/Qwen3-14B"
+  ],
+  "source_disable_thinking_values": [
+    true
+  ],
+  "created_at_unix": 1779060110,
+  "run_dir": "/gscratch/h2lab/mohanc3/projects/ERL_repo/single_turn_passk_runs/passk-qwen3-14b-nothink-origlogs-mechanism-k40-y8-z20-seed20260509-35327028-shard3",
+  "extract_only": false
+}
