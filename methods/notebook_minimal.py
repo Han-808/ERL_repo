@@ -56,8 +56,8 @@ This notebook contains knowledge accumulated from past episodes. Follow it when 
 - Symbols (A, B, C, D, E, a, b) are abstract; their meaning must be inferred from environment feedback across episodes.
 
 ## Movement Rules
-- Valid actions are listed in each observation.
-- Use only the exact action tokens shown by the current environment.
+- Valid actions: see the current observation.
+- Use only valid action tokens.
 
 ## Strategies
 - Always analyze the grid first, then pick the action whose predicted outcome is best.
