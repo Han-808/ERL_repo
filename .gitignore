@@ -6,6 +6,7 @@ results_*.json
 .env
 .claude/
 outputs/
+minigrid/
 
 # Local analysis/download artifacts.
 latest_y8z20_analysis_extract/
