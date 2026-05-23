@@ -23,11 +23,17 @@ from pathlib import Path
 
 from common import (
     BaseMethod,
+    action_example_for_env,
     build_client,
     call_lm,
+    default_action_for_env,
+    env_metadata,
+    format_action_set,
     parse_action_single,
     render_template,
+    success_from_reward,
     summarize_logs,
+    valid_actions_for_env,
 )
 _INSTRUCTIONS_DIR = Path(__file__).resolve().parents[1] / "instructions"
 
@@ -449,12 +455,23 @@ def _load_instruction(instruction_path: str) -> str:
 _GENERATOR_TEMPLATE = _load_instruction(_INSTRUCTIONS_DIR / "instruction_generator.md")
 
 
-def build_generator_prompt_with_playbook(observation: str, playbook: Playbook) -> str:
+def build_generator_prompt_with_playbook(
+    observation: str,
+    playbook: Playbook,
+    valid_actions=None,
+    action_example: str | None = None,
+) -> str:
     """Per-step Generator prompt with the full Playbook injected."""
+    actions = valid_actions or valid_actions_for_env(None)
+    example = action_example or actions[0]
+    if example not in actions:
+        example = actions[0]
     return render_template(
         _GENERATOR_TEMPLATE,
         playbook=playbook.to_prompt_string(),
         observation=observation,
+        action_set=format_action_set(actions),
+        action_example=example,
     )
 
 
@@ -633,41 +650,89 @@ class ACEMethod(BaseMethod):
         all_actions = []
         all_feedbacks = []
         generator_traces = []
+        trajectory_events = []
         reward = 0
+        valid_actions = valid_actions_for_env(self.env)
+        default_action = default_action_for_env(self.env)
 
         while not self.env.done:
+            step_index = len(all_actions) + 1
             obs = self.env.get_observation()
             lm_out = call_lm(
                 self.client, self.model, build_step_prompt(obs),
                 disable_thinking=self.disable_thinking,
             )
-            action = parse_action_single(lm_out)
+            action = parse_action_single(
+                lm_out,
+                valid_actions=valid_actions,
+                default_action=default_action,
+            )
             all_actions.append(action)
+            _, step_feedback, reward, done = self.env.step([action])
+            all_feedbacks.append(step_feedback)
             generator_traces.append({
-                "step": len(all_actions),
+                "step": step_index,
+                "observation": obs,
                 "action": action,
                 "playbook_ids": _extract_generator_playbook_ids(
                     lm_out, {it.id for it in self.playbook.items}
                 ),
                 "raw_output": lm_out,
+                "feedback": step_feedback,
+                "reward": reward,
+                "done": done,
             })
-            _, step_feedback, reward, done = self.env.step([action])
-            all_feedbacks.append(step_feedback)
+            trajectory_events.append({
+                "step": step_index,
+                "observation": obs,
+                "valid_actions": list(valid_actions),
+                "llm_output": lm_out,
+                "action": action,
+                "feedback": step_feedback,
+                "reward": reward,
+                "done": done,
+                "context_type": "playbook",
+                "playbook_before_step": self.playbook.to_dict(),
+            })
             if done:
                 break
 
-        return all_actions, " ".join(all_feedbacks), reward, generator_traces
+        return (
+            all_actions,
+            " ".join(all_feedbacks),
+            reward,
+            generator_traces,
+            trajectory_events,
+        )
 
     # -- Episode loop -------------------------------------------------------
 
     def run_episode(self, episode_num: int) -> dict:
         initial_obs = self.env.reset(seed=episode_num)
+        env_info = env_metadata(self.env)
+        playbook_before_episode = self.playbook.to_dict()
         # Online ACE evaluation: solve each new stage using the playbook
         # accumulated before seeing this stage. The running attempt-1 curve is
         # therefore the average pass rate over the first K online stages.
-        actions1, feedback1, reward1, generator_trace1 = self._run_attempt(
-            lambda obs: build_generator_prompt_with_playbook(obs, self.playbook)
+        (
+            actions1,
+            feedback1,
+            reward1,
+            generator_trace1,
+            trajectory_events,
+        ) = self._run_attempt(
+            lambda obs: build_generator_prompt_with_playbook(
+                obs,
+                self.playbook,
+                valid_actions=valid_actions_for_env(self.env),
+                action_example=action_example_for_env(self.env),
+            )
         )
+        for event in trajectory_events:
+            event["episode"] = episode_num
+            event["method"] = self.name
+            event["env_id"] = env_info["env_id"]
+            event["env_class"] = env_info["env_class"]
 
         print(f"\n{'='*40}")
         print(f"=== Episode {episode_num} ===")
@@ -715,9 +780,20 @@ class ACEMethod(BaseMethod):
 
         return {
             "episode": episode_num,
+            "env": env_info,
             "actions1": actions1,
             "feedback1": feedback1,
             "reward1": reward1,
+            "success": success_from_reward(reward1, self.reward_threshold),
+            "trajectory_events": trajectory_events,
+            "context_before_episode": {
+                "type": "playbook",
+                "playbook": playbook_before_episode,
+            },
+            "context_after_episode": {
+                "type": "playbook",
+                "playbook": self.playbook.to_dict(),
+            },
             "generator_trace1": generator_trace1,
             "reflection": reflection,
             "playbook_feedback": feedback_stats,

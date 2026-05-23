@@ -1,0 +1,60 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='1180' height='700' viewBox='0 0 1180 700'>
+<rect width='100%' height='100%' fill='#ffffff'/>
+<text x='96.00' y='74.00' font-family='Segoe UI, Helvetica Neue, Arial, sans-serif' font-size='20' font-weight='700' fill='#111827'>Sokoban</text>
+<text x='96.00' y='98.00' font-family='Segoe UI, Helvetica Neue, Arial, sans-serif' font-size='12' fill='#4b5563'>Running accuracy</text>
+<line x1='96.00' y1='546.00' x2='1106.00' y2='546.00' stroke='#111827' stroke-width='1'/>
+<text x='86.00' y='550.00' text-anchor='end' font-family='Segoe UI, Helvetica Neue, Arial, sans-serif' font-size='12' fill='#4b5563'>0%</text>
+<line x1='96.00' y1='503.00' x2='1106.00' y2='503.00' stroke='#e5e7eb' stroke-width='1'/>
+<text x='86.00' y='507.00' text-anchor='end' font-family='Segoe UI, Helvetica Neue, Arial, sans-serif' font-size='12' fill='#4b5563'>10%</text>
+<line x1='96.00' y1='460.00' x2='1106.00' y2='460.00' stroke='#e5e7eb' stroke-width='1'/>
+<text x='86.00' y='464.00' text-anchor='end' font-family='Segoe UI, Helvetica Neue, Arial, sans-serif' font-size='12' fill='#4b5563'>20%</text>
+<line x1='96.00' y1='417.00' x2='1106.00' y2='417.00' stroke='#e5e7eb' stroke-width='1'/>
+<text x='86.00' y='421.00' text-anchor='end' font-family='Segoe UI, Helvetica Neue, Arial, sans-serif' font-size='12' fill='#4b5563'>30%</text>
+<line x1='96.00' y1='374.00' x2='1106.00' y2='374.00' stroke='#e5e7eb' stroke-width='1'/>
+<text x='86.00' y='378.00' text-anchor='end' font-family='Segoe UI, Helvetica Neue, Arial, sans-serif' font-size='12' fill='#4b5563'>40%</text>
+<line x1='96.00' y1='331.00' x2='1106.00' y2='331.00' stroke='#e5e7eb' stroke-width='1'/>
+<text x='86.00' y='335.00' text-anchor='end' font-family='Segoe UI, Helvetica Neue, Arial, sans-serif' font-size='12' fill='#4b5563'>50%</text>
+<line x1='96.00' y1='288.00' x2='1106.00' y2='288.00' stroke='#e5e7eb' stroke-width='1'/>
+<text x='86.00' y='292.00' text-anchor='end' font-family='Segoe UI, Helvetica Neue, Arial, sans-serif' font-size='12' fill='#4b5563'>60%</text>
+<line x1='96.00' y1='245.00' x2='1106.00' y2='245.00' stroke='#e5e7eb' stroke-width='1'/>
+<text x='86.00' y='249.00' text-anchor='end' font-family='Segoe UI, Helvetica Neue, Arial, sans-serif' font-size='12' fill='#4b5563'>70%</text>
+<line x1='96.00' y1='202.00' x2='1106.00' y2='202.00' stroke='#e5e7eb' stroke-width='1'/>
+<text x='86.00' y='206.00' text-anchor='end' font-family='Segoe UI, Helvetica Neue, Arial, sans-serif' font-size='12' fill='#4b5563'>80%</text>
+<line x1='96.00' y1='159.00' x2='1106.00' y2='159.00' stroke='#e5e7eb' stroke-width='1'/>
+<text x='86.00' y='163.00' text-anchor='end' font-family='Segoe UI, Helvetica Neue, Arial, sans-serif' font-size='12' fill='#4b5563'>90%</text>
+<line x1='96.00' y1='116.00' x2='1106.00' y2='116.00' stroke='#e5e7eb' stroke-width='1'/>
+<text x='86.00' y='120.00' text-anchor='end' font-family='Segoe UI, Helvetica Neue, Arial, sans-serif' font-size='12' fill='#4b5563'>100%</text>
+<line x1='96.00' y1='116.00' x2='96.00' y2='546.00' stroke='#f3f4f6' stroke-width='1'/>
+<text x='96.00' y='570.00' text-anchor='middle' font-family='Segoe UI, Helvetica Neue, Arial, sans-serif' font-size='12' fill='#4b5563'>1</text>
+<line x1='198.13' y1='116.00' x2='198.13' y2='546.00' stroke='#f3f4f6' stroke-width='1'/>
+<text x='198.13' y='570.00' text-anchor='middle' font-family='Segoe UI, Helvetica Neue, Arial, sans-serif' font-size='12' fill='#4b5563'>10</text>
+<line x1='311.62' y1='116.00' x2='311.62' y2='546.00' stroke='#f3f4f6' stroke-width='1'/>
+<text x='311.62' y='570.00' text-anchor='middle' font-family='Segoe UI, Helvetica Neue, Arial, sans-serif' font-size='12' fill='#4b5563'>20</text>
+<line x1='538.58' y1='116.00' x2='538.58' y2='546.00' stroke='#f3f4f6' stroke-width='1'/>
+<text x='538.58' y='570.00' text-anchor='middle' font-family='Segoe UI, Helvetica Neue, Arial, sans-serif' font-size='12' fill='#4b5563'>40</text>
+<line x1='765.55' y1='116.00' x2='765.55' y2='546.00' stroke='#f3f4f6' stroke-width='1'/>
+<text x='765.55' y='570.00' text-anchor='middle' font-family='Segoe UI, Helvetica Neue, Arial, sans-serif' font-size='12' fill='#4b5563'>60</text>
+<line x1='992.52' y1='116.00' x2='992.52' y2='546.00' stroke='#f3f4f6' stroke-width='1'/>
+<text x='992.52' y='570.00' text-anchor='middle' font-family='Segoe UI, Helvetica Neue, Arial, sans-serif' font-size='12' fill='#4b5563'>80</text>
+<line x1='1106.00' y1='116.00' x2='1106.00' y2='546.00' stroke='#f3f4f6' stroke-width='1'/>
+<text x='1106.00' y='570.00' text-anchor='middle' font-family='Segoe UI, Helvetica Neue, Arial, sans-serif' font-size='12' fill='#4b5563'>90</text>
+<line x1='96.00' y1='116.00' x2='96.00' y2='546.00' stroke='#111827' stroke-width='1.3'/>
+<line x1='96.00' y1='546.00' x2='1106.00' y2='546.00' stroke='#111827' stroke-width='1.3'/>
+<polyline points='96.00,116.00 107.35,331.00 118.70,259.33 130.04,223.50 141.39,202.00 152.74,187.67 164.09,177.43 175.44,169.75 186.79,163.78 198.13,159.00 209.48,155.09 220.83,151.83 232.18,149.08 243.53,146.71 254.88,144.67 266.22,169.75 277.57,166.59 288.92,163.78 300.27,161.26 311.62,159.00 322.97,156.95 334.31,155.09 345.66,153.39 357.01,151.83 368.36,167.60 379.71,165.62 391.06,163.78 402.40,162.07 413.75,160.48 425.10,159.00 436.45,157.61 447.80,156.31 459.15,155.09 470.49,166.59 481.84,165.14 493.19,163.78 504.54,162.49 515.89,161.26 527.24,160.10 538.58,159.00 549.93,157.95 561.28,156.95 572.63,166.00 583.98,164.86 595.33,173.33 606.67,172.09 618.02,180.04 629.37,178.71 640.72,177.43 652.07,176.20 663.42,183.45 674.76,182.15 686.11,189.02 697.46,187.67 708.81,186.36 720.16,185.11 731.51,183.89 742.85,182.72 754.20,181.59 765.55,180.50 776.90,179.44 788.25,178.42 799.60,177.43 810.94,183.19 822.29,182.15 833.64,181.15 844.99,180.18 856.34,179.24 867.69,178.32 879.03,183.57 890.38,182.62 901.73,181.69 913.08,186.68 924.43,185.73 935.78,184.80 947.12,183.89 958.47,188.60 969.82,187.67 981.17,186.76 992.52,185.88' fill='none' stroke='#059669' stroke-width='3.2' stroke-linejoin='round' stroke-linecap='round'/>
+<circle cx='992.52' cy='185.88' r='4.0' fill='#ffffff' stroke='#059669' stroke-width='2.2'/>
+<polyline points='96.00,546.00 107.35,546.00 118.70,402.67 130.04,438.50 141.39,460.00 152.74,474.33 164.09,484.57 175.44,492.25 186.79,498.22 198.13,503.00 209.48,506.91 220.83,474.33 232.18,446.77 243.53,423.14 254.88,431.33 266.22,438.50 277.57,444.82 288.92,450.44 300.27,455.47 311.62,460.00 322.97,464.10 334.31,448.27 345.66,452.52 357.01,456.42 368.36,460.00 379.71,446.77 391.06,450.44 402.40,438.50 413.75,442.21 425.10,445.67 436.45,448.90 447.80,438.50 459.15,441.76 470.49,444.82 481.84,435.43 493.19,426.56 504.54,418.16 515.89,421.53 527.24,424.72 538.58,427.75 549.93,430.63 561.28,433.38 572.63,436.00 583.98,438.50 595.33,431.33 606.67,424.48 618.02,427.06 629.37,420.58 640.72,414.37 652.07,417.00 663.42,411.10 674.76,413.69 686.11,416.19 697.46,410.63 708.81,413.09 720.16,415.46 731.51,410.21 742.85,412.55 754.20,414.81 765.55,417.00 776.90,419.11 788.25,414.23 799.60,409.49 810.94,411.62 822.29,413.69 833.64,415.70 844.99,417.64 856.34,419.53 867.69,421.36 879.03,423.14 890.38,424.87 901.73,420.58 913.08,422.30 924.43,423.97 935.78,425.60 947.12,421.53 958.47,423.14 969.82,419.21 981.17,420.81 992.52,417.00' fill='none' stroke='#111827' stroke-width='3.2' stroke-linejoin='round' stroke-linecap='round'/>
+<circle cx='992.52' cy='417.00' r='4.0' fill='#ffffff' stroke='#111827' stroke-width='2.2'/>
+<polyline points='96.00,116.00 107.35,331.00 118.70,259.33 130.04,331.00 141.39,374.00 152.74,402.67 164.09,423.14 175.44,384.75 186.79,354.89 198.13,374.00 209.48,389.64 220.83,366.83 232.18,347.54 243.53,331.00 254.88,345.33 266.22,357.88 277.57,368.94 288.92,378.78 300.27,387.58 311.62,395.50 322.97,402.67 334.31,389.64 345.66,396.43 357.01,402.67 368.36,408.40 379.71,413.69 391.06,418.59 402.40,423.14 413.75,427.38 425.10,431.33 436.45,421.16 447.80,425.06 459.15,428.73 470.49,432.18 481.84,435.43 493.19,438.50 504.54,429.78 515.89,432.84 527.24,435.74 538.58,438.50 549.93,441.12 561.28,443.62 572.63,446.00 583.98,448.27 595.33,450.44 606.67,452.52 618.02,454.51 629.37,447.46 640.72,440.69 652.07,434.20 663.42,436.39 674.76,438.50 686.11,440.53 697.46,434.52 708.81,436.55 720.16,438.50 731.51,432.84 742.85,434.79 754.20,436.68 765.55,431.33 776.90,433.21 788.25,435.03 799.60,429.97 810.94,431.78 822.29,433.54 833.64,435.24 844.99,436.90 856.34,432.18 867.69,433.83 879.03,435.43 890.38,430.93 901.73,426.56 913.08,428.19 924.43,429.78 935.78,431.33 947.12,427.18 958.47,428.73 969.82,424.72 981.17,420.81 992.52,417.00' fill='none' stroke='#2563eb' stroke-width='3.2' stroke-linejoin='round' stroke-linecap='round'/>
+<circle cx='992.52' cy='417.00' r='4.0' fill='#ffffff' stroke='#2563eb' stroke-width='2.2'/>
+<polyline points='96.00,546.00 107.35,546.00 118.70,546.00 130.04,546.00 141.39,546.00 152.74,546.00 164.09,546.00 175.44,492.25 186.79,450.44 198.13,417.00 209.48,389.64 220.83,366.83 232.18,347.54 243.53,331.00 254.88,316.67 266.22,331.00 277.57,343.65 288.92,354.89 300.27,364.95 311.62,374.00 322.97,361.71 334.31,350.55 345.66,359.04 357.01,348.92 368.36,356.80 379.71,347.54 391.06,354.89 402.40,346.36 413.75,338.41 425.10,345.33 436.45,351.81 447.80,357.88 459.15,363.58 470.49,368.94 481.84,374.00 493.19,366.83 504.54,360.05 515.89,353.63 527.24,347.54 538.58,352.50 549.93,357.22 561.28,361.71 572.63,356.00 583.98,360.32 595.33,364.44 606.67,359.04 618.02,363.02 629.37,357.88 640.72,352.94 652.07,356.80 663.42,352.08 674.76,355.81 686.11,351.28 697.46,346.93 708.81,350.55 720.16,354.04 731.51,349.86 742.85,353.24 754.20,356.51 765.55,352.50 776.90,348.62 788.25,344.87 799.60,341.24 810.94,344.44 822.29,347.54 833.64,344.03 844.99,340.63 856.34,343.65 867.69,340.35 879.03,337.14 890.38,334.03 901.73,331.00 913.08,333.95 924.43,331.00 935.78,333.87 947.12,331.00 958.47,328.21 969.82,325.49 981.17,328.28 992.52,325.62' fill='none' stroke='#dc2626' stroke-width='3.2' stroke-linejoin='round' stroke-linecap='round'/>
+<circle cx='992.52' cy='325.62' r='4.0' fill='#ffffff' stroke='#dc2626' stroke-width='2.2'/>
+<line x1='96' y1='596' x2='130' y2='596' stroke='#059669' stroke-width='4.5' stroke-linecap='round'/>
+<text x='140' y='601' font-family='Segoe UI, Helvetica Neue, Arial, sans-serif' font-size='13' fill='#111827'>ACE-once (83.8%)</text>
+<line x1='356' y1='596' x2='390' y2='596' stroke='#111827' stroke-width='4.5' stroke-linecap='round'/>
+<text x='400' y='601' font-family='Segoe UI, Helvetica Neue, Arial, sans-serif' font-size='13' fill='#111827'>Minimal notebook (30.0%)</text>
+<line x1='616' y1='596' x2='650' y2='596' stroke='#2563eb' stroke-width='4.5' stroke-linecap='round'/>
+<text x='660' y='601' font-family='Segoe UI, Helvetica Neue, Arial, sans-serif' font-size='13' fill='#111827'>Think-ahead (30.0%)</text>
+<line x1='876' y1='596' x2='910' y2='596' stroke='#dc2626' stroke-width='4.5' stroke-linecap='round'/>
+<text x='920' y='601' font-family='Segoe UI, Helvetica Neue, Arial, sans-serif' font-size='13' fill='#111827'>Mechanism (51.2%)</text>
+<text x='590.00' y='670' text-anchor='middle' font-family='Segoe UI, Helvetica Neue, Arial, sans-serif' font-size='15' fill='#111827'>Episode</text>
+</svg>

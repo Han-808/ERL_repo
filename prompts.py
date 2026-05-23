@@ -6,8 +6,8 @@ No prompt strings should appear anywhere else in the codebase.
 Action format (matches the official microsoft/experiential_rl repo):
   - The LM is called once per step.
   - Output a <reason>...</reason> block, then the next action wrapped in
-    triple backticks on the last line, e.g. ```Up```.
-  - Valid actions are capitalized: Up, Down, Left, Right.
+    triple backticks on the last line, e.g. ```Up``` or ```forward```.
+  - Valid actions are supplied by the current environment.
 
 notebook_minimal builders (ACE simplified, single-LM-call per update):
   - build_notebook_agent_prompt: per-step prompt with notebook as context
@@ -15,8 +15,26 @@ notebook_minimal builders (ACE simplified, single-LM-call per update):
     emitting JSON {reasoning, operations[]} over a line-numbered notebook.
 """
 
+from common import (
+    DEFAULT_VALID_ACTIONS,
+    format_action_set,
+)
 
-def build_attempt1_prompt(observation: str, memory: list | None = None) -> str:
+
+def _prompt_action_fields(valid_actions=None, action_example=None):
+    actions = tuple(str(action) for action in (valid_actions or DEFAULT_VALID_ACTIONS))
+    example = action_example or actions[0]
+    if example not in actions:
+        example = actions[0]
+    return format_action_set(actions), example
+
+
+def build_attempt1_prompt(
+    observation: str,
+    memory: list | None = None,
+    valid_actions=None,
+    action_example: str | None = None,
+) -> str:
     """
     Per-step prompt for attempt 1.
 
@@ -30,6 +48,8 @@ def build_attempt1_prompt(observation: str, memory: list | None = None) -> str:
         if memory
         else "No past reflections or strategies recorded yet."
     )
+
+    action_set, example = _prompt_action_fields(valid_actions, action_example)
 
     return f"""{observation}
 
@@ -64,10 +84,10 @@ Your response MUST strictly follow this structure:
 </reason>
 
 Then output the NEXT ACTION inside triple backticks, like this:
-```Up```
+```{example}```
 
 Always remember:
-- Valid actions: Up, Down, Left, Right.
+- Valid actions: {action_set}.
 - Think step by step, but make the final line only the next action wrapped in triple backticks.
 """
 
@@ -76,13 +96,20 @@ Always remember:
 # notebook_minimal prompts (simplified ACE: one LM call per update)
 # ----------------------------------------------------------------------
 
-def build_notebook_agent_prompt(observation: str, notebook: str) -> str:
+def build_notebook_agent_prompt(
+    observation: str,
+    notebook: str,
+    valid_actions=None,
+    action_example: str | None = None,
+) -> str:
     """
     Per-step prompt for the notebook_minimal agent.
 
     The notebook is the accumulated context; it grows across episodes.
     The agent emits a short reason block and exactly one action.
     """
+    action_set, example = _prompt_action_fields(valid_actions, action_example)
+
     return f"""{observation}
 
 Your notebook below contains knowledge accumulated from past episodes.
@@ -102,10 +129,10 @@ and which action is safest.
 </reason>
 
 Then output the NEXT ACTION inside triple backticks, like this:
-```Up```
+```{example}```
 
 Always remember:
-- Valid actions: Up, Down, Left, Right.
+- Valid actions: {action_set}.
 - The final line must be ONLY the next action wrapped in triple backticks.
 """
 

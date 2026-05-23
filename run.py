@@ -12,6 +12,7 @@ Usage examples:
 
 import argparse
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -23,10 +24,16 @@ from common import print_episode_table, results_path, write_results
 from environments.frozen_lake import FrozenLake
 from environments.sokoban import Sokoban
 from methods.ace import ACEMethod
-from methods.ace_once import ACEOnceMethod
+from methods.ace_once import ACEOnceMethod, ACEOnceMiniGridMethod
 from methods.erl import ERLMethod
-from methods.notebook_minimal import NotebookMinimalMethod
-from methods.notebook_minimal_mechanism import NotebookMinimalMechanismMethod
+from methods.notebook_minimal import (
+    NotebookMinimalMethod,
+    NotebookMinimalMiniGridMethod,
+)
+from methods.notebook_minimal_mechanism import (
+    NotebookMinimalMechanismMethod,
+    NotebookMinimalMechanismMiniGridMethod,
+)
 from methods.notebook_minimal_thinkahead import NotebookMinimalThinkAheadMethod
 
 
@@ -44,6 +51,7 @@ METHODS = {
     "erl":                    (ERLMethod, "memory_size", "Memory Size"),
     "ace":                    (ACEMethod, "playbook_size", "Playbook Size"),
     "ace_once":               (ACEOnceMethod, "playbook_size", "Playbook Size"),
+    "ace_once_minigrid":      (ACEOnceMiniGridMethod, "playbook_size", "Playbook Size"),
     "notebook_minimal":       (_notebook_factory("empty"),
                                "notebook_size", "Notebook Lines"),
     "notebook_minimal_empty": (_notebook_factory("empty"),
@@ -52,6 +60,13 @@ METHODS = {
                                  "notebook_size", "Notebook Lines"),
     "notebook_minimal_mechanism": (NotebookMinimalMechanismMethod,
                                    "notebook_size", "Notebook Lines"),
+    "notebook_minimal_mechanism_minigrid": (
+        NotebookMinimalMechanismMiniGridMethod,
+        "notebook_size",
+        "Notebook Lines",
+    ),
+    "notebook_minimal_minigrid": (NotebookMinimalMiniGridMethod,
+                                  "notebook_size", "Notebook Lines"),
     "notebook_minimal_thinkahead": (NotebookMinimalThinkAheadMethod,
                                     "notebook_size", "Notebook Lines"),
 }
@@ -63,15 +78,38 @@ ENVS = {
 }
 
 
+def minigrid_output_label(env_id: str) -> str:
+    label = env_id
+    if label.startswith("MiniGrid-"):
+        label = label[len("MiniGrid-"):]
+    label = re.sub(r"-v\d+$", "", label)
+    label = re.sub(r"[^A-Za-z0-9]+", "_", label).strip("_").lower()
+    return f"minigrid_{label or 'env'}"
+
+
+def build_env(env_name: str, args):
+    if env_name == "minigrid":
+        from environments.minigrid_env import MiniGridTextEnv
+        return MiniGridTextEnv(args.minigrid_id)
+    return ENVS[env_name]()
+
+
+def output_env_name(env_name: str, args) -> str:
+    if env_name == "minigrid":
+        return minigrid_output_label(args.minigrid_id)
+    return env_name
+
+
 def run_experiment(method_name: str, env_name: str, args) -> None:
     outputs_dir = Path(args.outputs_dir)
+    env_label = output_env_name(env_name, args)
     os.environ["LLM_TRACE_PATH"] = str(
-        outputs_dir / f"llm_calls_{method_name}_{env_name}.jsonl"
+        outputs_dir / f"llm_calls_{method_name}_{env_label}.jsonl"
     )
     print(f"LM traces will be saved to {os.environ['LLM_TRACE_PATH']}")
 
     method_cls, size_field, size_header = METHODS[method_name]
-    env = ENVS[env_name]()
+    env = build_env(env_name, args)
     method = method_cls(
         env,
         model=args.model,
@@ -84,7 +122,7 @@ def run_experiment(method_name: str, env_name: str, args) -> None:
         results["logs"], size_field=size_field, size_header=size_header
     )
 
-    out_path = results_path(args.outputs_dir, method_name, env_name)
+    out_path = results_path(args.outputs_dir, method_name, env_label)
     write_results(out_path, results)
     print(f"Saved to {out_path}")
 
@@ -96,8 +134,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Method to run.",
     )
     parser.add_argument(
-        "--env", choices=["frozen_lake", "sokoban", "both"], default="both",
+        "--env", choices=["frozen_lake", "sokoban", "both", "minigrid"],
+        default="both",
         help="Which environment to run (default: both).",
+    )
+    parser.add_argument(
+        "--minigrid-id",
+        default="MiniGrid-Empty-5x5-v0",
+        help=(
+            "Gymnasium MiniGrid id to use when --env minigrid "
+            "(default: MiniGrid-Empty-5x5-v0)."
+        ),
     )
     parser.add_argument(
         "--episodes", type=int, default=20,

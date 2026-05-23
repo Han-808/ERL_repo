@@ -32,6 +32,7 @@ class NotebookMinimalMechanismMethod(NotebookMinimalMethod):
         self.name = f"{self.variant_name}{suffix}"
 
     def _update_notebook(self, initial_obs, actions, feedback, reward):
+        notebook_before = self.notebook
         prompt = build_notebook_updater_prompt(
             numbered_notebook=number_lines(self.notebook),
             initial_obs=initial_obs,
@@ -45,21 +46,48 @@ class NotebookMinimalMechanismMethod(NotebookMinimalMethod):
             self.client, self.model, prompt,
             disable_thinking=self.disable_thinking,
         )
+        update_info = {
+            "raw_output": raw,
+            "reasoning": "",
+            "operations": [],
+            "applied_operations": [],
+            "parse_error": None,
+            "notebook_before": notebook_before,
+            "notebook_after": notebook_before,
+            "notebook_changed": False,
+            "updater_objective": self.updater_objective,
+        }
         if not raw.strip():
             print("[notebook_minimal] empty updater response; no edit.")
-            return ""
+            update_info["parse_error"] = "empty updater response"
+            return update_info
         try:
             payload = extract_json_payload(raw)
         except Exception as exc:
             print(f"[notebook_minimal] JSON parse failed: {exc}")
-            return ""
+            update_info["parse_error"] = str(exc)
+            return update_info
         ops = validate_operations(payload.get("operations", []))
         reasoning = payload.get("reasoning", "")
         new_notebook, applied = apply_notebook_operations(self.notebook, ops)
         self.notebook = new_notebook
+        update_info.update({
+            "reasoning": reasoning,
+            "operations": ops,
+            "applied_operations": applied,
+            "notebook_after": self.notebook,
+            "notebook_changed": self.notebook != notebook_before,
+        })
         if applied:
             print(f"[Notebook] {len(applied)} ops applied; now "
                   f"{len(self.notebook.splitlines())} lines.")
         else:
             print("[Notebook] no ops applied.")
-        return reasoning
+        return update_info
+
+
+class NotebookMinimalMechanismMiniGridMethod(NotebookMinimalMechanismMethod):
+    """MiniGrid-compatible alias for notebook_minimal_mechanism."""
+
+    name = "notebook_minimal_mechanism_minigrid"
+    variant_name = "notebook_minimal_mechanism_minigrid"

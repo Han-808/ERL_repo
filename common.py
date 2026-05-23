@@ -15,7 +15,44 @@ from pathlib import Path
 from openai import OpenAI
 
 
-_VALID_ACTIONS = {"Up", "Down", "Left", "Right"}
+DEFAULT_VALID_ACTIONS = ("Up", "Down", "Left", "Right")
+DEFAULT_ACTION = "Down"
+
+
+def valid_actions_for_env(env=None) -> tuple[str, ...]:
+    """Return the action tokens an environment expects from the LM."""
+    actions = getattr(env, "ACTIONS", DEFAULT_VALID_ACTIONS)
+    return tuple(str(action) for action in actions)
+
+
+def default_action_for_env(env=None) -> str:
+    """Return the parser fallback action for an environment."""
+    return str(getattr(env, "DEFAULT_ACTION", DEFAULT_ACTION))
+
+
+def action_example_for_env(env=None) -> str:
+    """Return the example action token to show in prompts."""
+    actions = valid_actions_for_env(env)
+    return str(getattr(env, "ACTION_EXAMPLE", actions[0]))
+
+
+def format_action_set(valid_actions=None) -> str:
+    """Format action tokens for prompt text."""
+    actions = valid_actions or DEFAULT_VALID_ACTIONS
+    return ", ".join(str(action) for action in actions)
+
+
+def env_metadata(env) -> dict:
+    """Return stable metadata useful for downstream RL data extraction."""
+    return {
+        "env_class": type(env).__name__,
+        "env_id": getattr(env, "env_id", type(env).__name__),
+        "valid_actions": list(valid_actions_for_env(env)),
+    }
+
+
+def success_from_reward(reward, reward_threshold: float) -> bool:
+    return reward >= reward_threshold
 
 
 # ----------------------------------------------------------------------
@@ -168,34 +205,59 @@ def call_lm(client, model: str, prompt: str,
 # Action parser
 # ----------------------------------------------------------------------
 
-def parse_action_single(lm_output: str) -> str:
+def _normalize_action_token(token: str) -> str:
+    return str(token).strip().strip("`'\".,:;()[]{}").casefold()
+
+
+def _match_action_token(token: str, valid_actions: tuple[str, ...]) -> str | None:
+    lookup = {
+        _normalize_action_token(action): action
+        for action in valid_actions
+    }
+    return lookup.get(_normalize_action_token(token))
+
+
+def parse_action_single(
+    lm_output: str,
+    valid_actions=None,
+    default_action: str | None = None,
+) -> str:
     """
     Extract one action from the LM's output.
 
-    Primary format: triple backticks, e.g. ```Down```.
+    Primary format: triple backticks, e.g. ```Down``` or ```forward```.
     Fallback 1: any backtick-quoted token, e.g. `Down`.
     Fallback 2: first valid action word found scanning lines bottom-up.
-    Fallback 3: "Down" if nothing matches.
+    Fallback 3: the supplied default action, or "Down" for legacy grids.
     """
-    m = re.search(r"```(\w+)```", lm_output)
+    actions = tuple(str(action) for action in (valid_actions or DEFAULT_VALID_ACTIONS))
+    fallback = default_action or DEFAULT_ACTION
+    if _match_action_token(fallback, actions) is None:
+        fallback = actions[0]
+
+    m = re.search(
+        r"```\s*(?:[A-Za-z_][\w-]*\s*\n)?\s*([\w-]+)\s*```",
+        lm_output,
+    )
     if m:
-        action = m.group(1).strip().title()
-        if action in _VALID_ACTIONS:
+        action = _match_action_token(m.group(1), actions)
+        if action is not None:
             return action
 
-    m = re.search(r"`(\w+)`", lm_output)
+    m = re.search(r"`\s*([\w-]+)\s*`", lm_output)
     if m:
-        action = m.group(1).strip().title()
-        if action in _VALID_ACTIONS:
+        action = _match_action_token(m.group(1), actions)
+        if action is not None:
             return action
 
     for line in reversed(lm_output.strip().split("\n")):
-        for action in ("Up", "Down", "Left", "Right"):
-            if action in line:
+        for action in sorted(actions, key=len, reverse=True):
+            pattern = r"\b" + re.escape(action) + r"\b"
+            if re.search(pattern, line, re.IGNORECASE):
                 return action
 
-    print("[Warning] Could not parse action; using fallback 'Down'.")
-    return "Down"
+    print(f"[Warning] Could not parse action; using fallback '{fallback}'.")
+    return fallback
 
 
 # ----------------------------------------------------------------------
@@ -294,6 +356,10 @@ def summarize_logs(all_logs: list, reward_threshold: float,
 
     return {
         "logs": all_logs,
+        "rl_training_schema_version": 1,
+        "trajectory_event_count": sum(
+            len(lg.get("trajectory_events", [])) for lg in all_logs
+        ),
         "pass_rate": rate,
         "attempt1_rate": rate,
         "running_pass_rate": running_rate,

@@ -11,10 +11,13 @@ triple backticks (e.g. ```Down```), matching the paper's Table 2 format.
 
 from common import (
     BaseMethod,
+    action_example_for_env,
     build_client,
     call_lm,
+    default_action_for_env,
     parse_action_single,
     summarize_logs,
+    valid_actions_for_env,
 )
 from prompts import (
     build_attempt1_prompt,
@@ -69,6 +72,8 @@ class ERLMethod(BaseMethod):
         all_actions = []
         all_feedbacks = []
         reward = 0
+        valid_actions = valid_actions_for_env(self.env)
+        default_action = default_action_for_env(self.env)
 
         while not self.env.done:
             obs = self.env.get_observation()
@@ -76,7 +81,11 @@ class ERLMethod(BaseMethod):
                 self.client, self.model, build_step_prompt(obs),
                 disable_thinking=self.disable_thinking,
             )
-            action = parse_action_single(lm_out)
+            action = parse_action_single(
+                lm_out,
+                valid_actions=valid_actions,
+                default_action=default_action,
+            )
             all_actions.append(action)
             _, step_feedback, reward, done = self.env.step([action])
             all_feedbacks.append(step_feedback)
@@ -89,8 +98,15 @@ class ERLMethod(BaseMethod):
 
     def run_episode(self, episode_num: int) -> dict:
         initial_obs = self.env.reset(seed=episode_num)
+        valid_actions = valid_actions_for_env(self.env)
+        action_example = action_example_for_env(self.env)
         actions1, feedback1, reward1 = self._run_attempt(
-            lambda obs: build_attempt1_prompt(obs, self.memory)
+            lambda obs: build_attempt1_prompt(
+                obs,
+                self.memory,
+                valid_actions=valid_actions,
+                action_example=action_example,
+            )
         )
 
         print(f"\n{'='*40}")

@@ -10,7 +10,15 @@ trajectory inputs.
 
 from dataclasses import asdict
 
-from common import call_lm, render_template
+from common import (
+    action_example_for_env,
+    call_lm,
+    env_metadata,
+    format_action_set,
+    render_template,
+    success_from_reward,
+    valid_actions_for_env,
+)
 from methods.ace import (
     ACEMethod,
     DeltaItem,
@@ -139,7 +147,7 @@ Sample {{ current_step }} out of {{ total_samples }}
 <<<TASK_CONTEXT>>>
 Deterministic grid-navigation task. The Generator sees the current observation, \
 predicts one action per step, and the environment returns feedback plus reward \
-for the trajectory. Valid actions are Up, Down, Left, and Right.
+for the trajectory. Valid actions are: {{ action_set }}.
 <<<TASK_CONTEXT>>>
 
 ---
@@ -245,8 +253,10 @@ def build_merged_prompt(
     playbook: Playbook,
     current_step: int | str = "not provided",
     total_samples: int | str = "not provided",
+    valid_actions=None,
 ) -> str:
     """Build the one-call ACE updater prompt for grid-game trajectories."""
+    actions_for_prompt = valid_actions or valid_actions_for_env(None)
     return render_template(
         MERGED_PROMPT,
         observation=observation,
@@ -258,6 +268,7 @@ def build_merged_prompt(
         playbook_stats=_format_playbook_stats(playbook),
         current_step=current_step,
         total_samples=total_samples,
+        action_set=format_action_set(actions_for_prompt),
     )
 
 
@@ -272,6 +283,7 @@ def run_merged_reflector_curator(
     playbook: Playbook,
     current_step: int | str = "not provided",
     total_samples: int | str = "not provided",
+    valid_actions=None,
     disable_thinking: bool = False,
 ) -> tuple[dict, list[DeltaItem]]:
     """Reflect on the trajectory and curate ADD-only playbook deltas in one call."""
@@ -284,6 +296,7 @@ def run_merged_reflector_curator(
         playbook=playbook,
         current_step=current_step,
         total_samples=total_samples,
+        valid_actions=valid_actions,
     )
     raw = call_lm(
         lm_client, model, prompt, disable_thinking=disable_thinking
@@ -306,9 +319,27 @@ class ACEOnceMethod(ACEMethod):
 
     def run_episode(self, episode_num: int) -> dict:
         initial_obs = self.env.reset(seed=episode_num)
-        actions1, feedback1, reward1, generator_trace1 = self._run_attempt(
-            lambda obs: build_generator_prompt_with_playbook(obs, self.playbook)
+        env_info = env_metadata(self.env)
+        playbook_before_episode = self.playbook.to_dict()
+        (
+            actions1,
+            feedback1,
+            reward1,
+            generator_trace1,
+            trajectory_events,
+        ) = self._run_attempt(
+            lambda obs: build_generator_prompt_with_playbook(
+                obs,
+                self.playbook,
+                valid_actions=valid_actions_for_env(self.env),
+                action_example=action_example_for_env(self.env),
+            )
         )
+        for event in trajectory_events:
+            event["episode"] = episode_num
+            event["method"] = self.name
+            event["env_id"] = env_info["env_id"]
+            event["env_class"] = env_info["env_class"]
 
         print(f"\n{'=' * 40}")
         print(f"=== Episode {episode_num} ===")
@@ -324,6 +355,7 @@ class ACEOnceMethod(ACEMethod):
             self.playbook,
             current_step=episode_num,
             total_samples=self.total_episodes,
+            valid_actions=valid_actions_for_env(self.env),
             disable_thinking=self.disable_thinking,
         )
         print("[ACEOnce] Structured reflection and curated deltas captured")
@@ -350,9 +382,20 @@ class ACEOnceMethod(ACEMethod):
 
         return {
             "episode": episode_num,
+            "env": env_info,
             "actions1": actions1,
             "feedback1": feedback1,
             "reward1": reward1,
+            "success": success_from_reward(reward1, self.reward_threshold),
+            "trajectory_events": trajectory_events,
+            "context_before_episode": {
+                "type": "playbook",
+                "playbook": playbook_before_episode,
+            },
+            "context_after_episode": {
+                "type": "playbook",
+                "playbook": self.playbook.to_dict(),
+            },
             "generator_trace1": generator_trace1,
             "reflection": reflection,
             "playbook_feedback": feedback_stats,
@@ -360,3 +403,9 @@ class ACEOnceMethod(ACEMethod):
             "playbook": self.playbook.to_dict(),
             "playbook_size": len(self.playbook.items),
         }
+
+
+class ACEOnceMiniGridMethod(ACEOnceMethod):
+    """MiniGrid-compatible alias for ace_once."""
+
+    name = "ace_once_minigrid"
