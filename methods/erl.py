@@ -15,7 +15,7 @@ from common import (
     build_client,
     call_lm,
     default_action_for_env,
-    parse_action_single,
+    parse_action_single_with_status,
     summarize_logs,
     valid_actions_for_env,
 )
@@ -81,13 +81,19 @@ class ERLMethod(BaseMethod):
                 self.client, self.model, build_step_prompt(obs),
                 disable_thinking=self.disable_thinking,
             )
-            action = parse_action_single(
+            action, parsed_ok = parse_action_single_with_status(
                 lm_out,
                 valid_actions=valid_actions,
                 default_action=default_action,
             )
             all_actions.append(action)
-            _, step_feedback, reward, done = self.env.step([action])
+            _, step_feedback, raw_reward, done = self.env.step([action])
+            reward = raw_reward if parsed_ok else 0
+            if not parsed_ok:
+                step_feedback = (
+                    f"Action parse failed; fallback action '{action}' was "
+                    f"executed, but counted reward is 0. {step_feedback}"
+                )
             all_feedbacks.append(step_feedback)
             if done:
                 break

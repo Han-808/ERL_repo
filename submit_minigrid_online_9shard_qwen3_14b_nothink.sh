@@ -1,21 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Full MiniGrid online runs split across 6 long-lived SGLang servers:
-#   A100 job: 3 array tasks, one per method, env indices 0-5
-#   L40 job:  3 array tasks, one per method, env indices 6-10
+# Full MiniGrid online runs split across 9 long-lived SGLang servers:
+#   A100 job: 3 array tasks, all ace_once_minigrid
+#   L40 job:  6 array tasks, 3 notebook_minimal_minigrid and
+#             3 notebook_minimal_mechanism_minigrid
 #
-# Each array task starts one SGLang server and runs its env chunk
-# sequentially. Every (method, env) run gets a fresh output directory under:
+# Each array task starts one SGLang server and runs its env shard sequentially.
+# Every (method, env) run gets a fresh output directory under:
 #   ${REPO_DIR}/minigrid/<run-label>/
 #
 # Usage:
-#   bash submit_minigrid_online_6shard_qwen3_14b_nothink.sh --dry-run
-#   bash submit_minigrid_online_6shard_qwen3_14b_nothink.sh
+#   bash submit_minigrid_online_9shard_qwen3_14b_nothink.sh --dry-run
+#   bash submit_minigrid_online_9shard_qwen3_14b_nothink.sh
 #
 # Useful overrides:
-#   EPISODES=80 bash submit_minigrid_online_6shard_qwen3_14b_nothink.sh
-#   SUBMIT_A100=1 SUBMIT_L40=0 bash submit_minigrid_online_6shard_qwen3_14b_nothink.sh
+#   EPISODES=80 bash submit_minigrid_online_9shard_qwen3_14b_nothink.sh
+#   SUBMIT_A100=1 SUBMIT_L40=0 bash submit_minigrid_online_9shard_qwen3_14b_nothink.sh
 
 REPO_DIR="${REPO_DIR:-/gscratch/h2lab/mohanc3/projects/ERL_repo}"
 UV="${UV:-/gscratch/stf/mohanc3/uv-env/uv-bin/uv}"
@@ -38,7 +39,7 @@ A100_ARRAY_MAX_CONCURRENT="${A100_ARRAY_MAX_CONCURRENT:-3}"
 
 L40_PARTITION="${L40_PARTITION:-gpu-l40}"
 L40_GPU_REQUEST="${L40_GPU_REQUEST:-l40:1}"
-L40_ARRAY_MAX_CONCURRENT="${L40_ARRAY_MAX_CONCURRENT:-3}"
+L40_ARRAY_MAX_CONCURRENT="${L40_ARRAY_MAX_CONCURRENT:-6}"
 
 SUBMIT_A100="${SUBMIT_A100:-1}"
 SUBMIT_L40="${SUBMIT_L40:-1}"
@@ -65,15 +66,16 @@ test -f "${REPO_DIR}/methods/notebook_minimal_mechanism.py"
 test -x "${UV}"
 test -x "${SGLANG}"
 
-submit_chunk_job() {
+submit_sharded_job() {
   local chunk_name="$1"
   local partition="$2"
   local gpu_request="$3"
-  local array_max_concurrent="$4"
-  local time_limit="$5"
-  local env_start="$6"
-  local env_end="$7"
-  local port_base="$8"
+  local array_spec="$4"
+  local array_max_concurrent="$5"
+  local time_limit="$6"
+  local port_base="$7"
+  local method_map="$8"
+  local shard_map="$9"
   local job_name="${JOB_NAME_PREFIX}-${chunk_name}"
 
   local sbatch_cmd=(
@@ -81,7 +83,7 @@ submit_chunk_job() {
   --job-name="${job_name}"
   --account="${ACCOUNT}"
   --partition="${partition}"
-  --array="0-2%${array_max_concurrent}"
+  --array="${array_spec}%${array_max_concurrent}"
   --nodes=1
   --ntasks=1
   --cpus-per-task="${CPUS_PER_TASK}"
@@ -128,11 +130,8 @@ submit_chunk_job() {
 
     mkdir -p \"\$HF_HOME\" \"\$WANDB_DIR\" \"\$XDG_CACHE_HOME\" \"\$TORCH_EXTENSIONS_DIR\" \"\$TVM_FFI_CACHE_DIR\"
 
-    METHODS=(
-      'notebook_minimal_minigrid'
-      'notebook_minimal_mechanism_minigrid'
-      'ace_once_minigrid'
-    )
+    METHOD_MAP=(${method_map})
+    ENV_SHARDS=(${shard_map})
     MINIGRID_IDS=(
       'MiniGrid-BlockedUnlockPickup-v0'
       'MiniGrid-LavaCrossingS9N3-v0'
@@ -148,7 +147,9 @@ submit_chunk_job() {
     )
 
     TASK_ID=\${SLURM_ARRAY_TASK_ID}
-    METHOD=\${METHODS[\$TASK_ID]}
+    METHOD=\${METHOD_MAP[\$TASK_ID]}
+    ENV_INDEX_CSV=\${ENV_SHARDS[\$TASK_ID]}
+    IFS=',' read -r -a ENV_INDICES <<< \"\$ENV_INDEX_CSV\"
     PORT=\$((${port_base} + TASK_ID))
     SERVER_LABEL=\"\${SLURM_JOB_NAME}-\${SLURM_ARRAY_JOB_ID}_\${TASK_ID}-\${METHOD}\"
     SGLANG_LOG='${LOG_DIR}'/\"\$SERVER_LABEL-sglang_server.log\"
@@ -158,33 +159,17 @@ submit_chunk_job() {
     echo \"Node: \$(hostname)\"
     echo \"Model: ${MODEL}\"
     echo \"Method: \$METHOD\"
-    echo \"Env chunk: ${env_start}-${env_end}\"
+    echo \"Env indices: \$ENV_INDEX_CSV\"
     echo \"Episodes per env: ${EPISODES}\"
     echo \"Partition/account: ${partition}/${ACCOUNT}\"
     echo \"GPU request: ${gpu_request}\"
     echo \"Port: \$PORT\"
     echo -e \"env_index\\tenv_id\\tstatus\\toutputs_dir\" > \"\$SHARD_STATUS\"
 
-    '${UV}' run python - <<'PY'
-from environments.minigrid_env import MiniGridTextEnv
-env_ids = [
-    'MiniGrid-BlockedUnlockPickup-v0',
-    'MiniGrid-LavaCrossingS9N3-v0',
-    'MiniGrid-SimpleCrossingS9N3-v0',
-    'MiniGrid-DistShift1-v0',
-    'MiniGrid-Dynamic-Obstacles-Random-5x5-v0',
-    'MiniGrid-Empty-Random-5x5-v0',
-    'MiniGrid-Fetch-5x5-N2-v0',
-    'MiniGrid-FourRooms-v0',
-    'MiniGrid-LavaGapS5-v0',
-    'MiniGrid-MemoryS13-v0',
-    'MiniGrid-MemoryS11-v0',
-]
-for env_id in env_ids[${env_start}:$((env_end + 1))]:
-    env = MiniGridTextEnv(env_id)
-    env.close()
-    print(f'MiniGrid smoke ok: {env_id}')
-PY
+    for ENV_IDX in \"\${ENV_INDICES[@]}\"; do
+      MINIGRID_ID=\${MINIGRID_IDS[\$ENV_IDX]}
+      '${UV}' run python -c \"from environments.minigrid_env import MiniGridTextEnv; env=MiniGridTextEnv('\$MINIGRID_ID'); env.close(); print('MiniGrid smoke ok: \$MINIGRID_ID')\"
+    done
 
     '${SGLANG}' serve \
       --model-path '${MODEL}' \
@@ -224,7 +209,7 @@ PY
       exit 1
     fi
 
-    for ENV_IDX in \$(seq ${env_start} ${env_end}); do
+    for ENV_IDX in \"\${ENV_INDICES[@]}\"; do
       MINIGRID_ID=\${MINIGRID_IDS[\$ENV_IDX]}
       ENV_LABEL=\$('${UV}' run python -c \"from run import minigrid_output_label; print(minigrid_output_label('\$MINIGRID_ID'))\")
       RUN_LABEL=\"\${SLURM_JOB_NAME}-\${SLURM_ARRAY_JOB_ID}_\${TASK_ID}-\${METHOD}-\${ENV_LABEL}\"
@@ -254,7 +239,7 @@ PY
   "
   )
 
-  echo "Submitting ${job_name}: partition=${partition}, gpu=${gpu_request}, envs=${env_start}-${env_end}, array=0-2%${array_max_concurrent}"
+  echo "Submitting ${job_name}: partition=${partition}, gpu=${gpu_request}, array=${array_spec}%${array_max_concurrent}"
   if [[ "${DRY_RUN}" -eq 1 ]]; then
     printf '%q ' "${sbatch_cmd[@]}"
     echo
@@ -263,10 +248,38 @@ PY
   fi
 }
 
+ACE_METHODS="ace_once_minigrid ace_once_minigrid ace_once_minigrid"
+NOTEBOOK_METHODS="notebook_minimal_minigrid notebook_minimal_minigrid notebook_minimal_minigrid notebook_minimal_mechanism_minigrid notebook_minimal_mechanism_minigrid notebook_minimal_mechanism_minigrid"
+
+# Balanced from the 1-episode smoke timings on A100. The slowest environment
+# for each method is isolated so the long shard determines less of the run.
+ACE_ENV_SHARDS="0 2,6,5,4,7,8 10,9,1,3"
+NOTEBOOK_ENV_SHARDS="0 2,7,5,8,3,4 6,10,1,9"
+MECHANISM_ENV_SHARDS="9 0,7,5,4,8 2,3,10,6,1"
+L40_ENV_SHARDS="${NOTEBOOK_ENV_SHARDS} ${MECHANISM_ENV_SHARDS}"
+
 if [[ "${SUBMIT_A100}" == "1" ]]; then
-  submit_chunk_job "a100-env0-5" "${A100_PARTITION}" "${A100_GPU_REQUEST}" "${A100_ARRAY_MAX_CONCURRENT}" "${A100_TIME_LIMIT}" 0 5 30000
+  submit_sharded_job \
+    "a100-ace-once" \
+    "${A100_PARTITION}" \
+    "${A100_GPU_REQUEST}" \
+    "0-2" \
+    "${A100_ARRAY_MAX_CONCURRENT}" \
+    "${A100_TIME_LIMIT}" \
+    30000 \
+    "${ACE_METHODS}" \
+    "${ACE_ENV_SHARDS}"
 fi
 
 if [[ "${SUBMIT_L40}" == "1" ]]; then
-  submit_chunk_job "l40-env6-10" "${L40_PARTITION}" "${L40_GPU_REQUEST}" "${L40_ARRAY_MAX_CONCURRENT}" "${L40_TIME_LIMIT}" 6 10 30100
+  submit_sharded_job \
+    "l40-notebooks" \
+    "${L40_PARTITION}" \
+    "${L40_GPU_REQUEST}" \
+    "0-5" \
+    "${L40_ARRAY_MAX_CONCURRENT}" \
+    "${L40_TIME_LIMIT}" \
+    30100 \
+    "${NOTEBOOK_METHODS}" \
+    "${L40_ENV_SHARDS}"
 fi

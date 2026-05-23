@@ -21,6 +21,7 @@ Ablation switches:
 
 import json
 import re
+import time
 
 from common import (
     BaseMethod,
@@ -29,7 +30,7 @@ from common import (
     call_lm,
     default_action_for_env,
     env_metadata,
-    parse_action_single,
+    parse_action_single_with_status,
     success_from_reward,
     summarize_logs,
     valid_actions_for_env,
@@ -310,17 +311,25 @@ class NotebookMinimalMethod(BaseMethod):
                 valid_actions=valid_actions,
                 action_example=action_example,
             )
+            lm_started = time.time()
             raw = call_lm(
                 self.client, self.model, prompt,
                 disable_thinking=self.disable_thinking,
             )
-            action = parse_action_single(
+            lm_elapsed = time.time() - lm_started
+            action, parsed_ok = parse_action_single_with_status(
                 raw,
                 valid_actions=valid_actions,
                 default_action=default_action,
             )
             actions.append(action)
-            _, step_fb, reward, done = self.env.step([action])
+            _, step_fb, raw_reward, done = self.env.step([action])
+            reward = raw_reward if parsed_ok else 0
+            if not parsed_ok:
+                step_fb = (
+                    f"Action parse failed; fallback action '{action}' was "
+                    f"executed, but counted reward is 0. {step_fb}"
+                )
             feedbacks.append(step_fb)
             trajectory_events.append({
                 "step": step_index,
@@ -328,12 +337,19 @@ class NotebookMinimalMethod(BaseMethod):
                 "valid_actions": list(valid_actions),
                 "llm_output": raw,
                 "action": action,
+                "action_parse_failed": not parsed_ok,
                 "feedback": step_fb,
+                "raw_env_reward": raw_reward,
                 "reward": reward,
                 "done": done,
                 "context_type": "notebook",
                 "context_before_step": self.notebook,
             })
+            print(
+                f"[notebook_minimal generator] step={step_index} "
+                f"action={action} reward={reward} done={done} "
+                f"lm={lm_elapsed:.1f}s"
+            )
             if done:
                 break
         return actions, " ".join(feedbacks), reward, trajectory_events
@@ -350,10 +366,12 @@ class NotebookMinimalMethod(BaseMethod):
             reward=reward,
             reward_threshold=self.reward_threshold,
         )
+        lm_started = time.time()
         raw = call_lm(
             self.client, self.model, prompt,
             disable_thinking=self.disable_thinking,
         )
+        print(f"[notebook_minimal updater] lm={time.time() - lm_started:.1f}s")
         update_info = {
             "raw_output": raw,
             "reasoning": "",

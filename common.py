@@ -162,19 +162,25 @@ def call_lm(client, model: str, prompt: str,
             "chat_template_kwargs": {"enable_thinking": False},
         }
 
+    started_at = time.time()
     try:
         response = client.chat.completions.create(**request_kwargs)
+        finished_at = time.time()
         message = response.choices[0].message
         content = message.content or ""
         reasoning_contents = _extract_reasoning_contents(response)
         _append_lm_trace({
-            "timestamp": int(time.time()),
+            "timestamp": int(finished_at),
+            "started_at": int(started_at),
+            "duration_seconds": round(finished_at - started_at, 3),
             "model": model,
             "disable_thinking": disable_thinking,
+            "prompt_chars": len(prompt),
             "prompt": prompt,
             "messages": messages,
             "request": request_kwargs,
             "response": _safe_model_dump(response),
+            "content_chars": len(content),
             "content": content,
             "reasoning_content": (
                 reasoning_contents[0] if reasoning_contents else None
@@ -184,15 +190,20 @@ def call_lm(client, model: str, prompt: str,
         })
         return content
     except Exception as exc:
+        finished_at = time.time()
         print(f"[LM error] {exc}")
         _append_lm_trace({
-            "timestamp": int(time.time()),
+            "timestamp": int(finished_at),
+            "started_at": int(started_at),
+            "duration_seconds": round(finished_at - started_at, 3),
             "model": model,
             "disable_thinking": disable_thinking,
+            "prompt_chars": len(prompt),
             "prompt": prompt,
             "messages": messages,
             "request": request_kwargs,
             "response": None,
+            "content_chars": 0,
             "content": "",
             "reasoning_content": None,
             "reasoning_contents": [],
@@ -217,18 +228,21 @@ def _match_action_token(token: str, valid_actions: tuple[str, ...]) -> str | Non
     return lookup.get(_normalize_action_token(token))
 
 
-def parse_action_single(
+def parse_action_single_with_status(
     lm_output: str,
     valid_actions=None,
     default_action: str | None = None,
-) -> str:
+) -> tuple[str, bool]:
     """
-    Extract one action from the LM's output.
+    Extract one action from the LM's output and report parse success.
 
     Primary format: triple backticks, e.g. ```Down``` or ```forward```.
     Fallback 1: any backtick-quoted token, e.g. `Down`.
     Fallback 2: first valid action word found scanning lines bottom-up.
     Fallback 3: the supplied default action, or "Down" for legacy grids.
+
+    Returns (action, parsed_ok). parsed_ok is False only when fallback action
+    had to be used because no valid action token appeared in lm_output.
     """
     actions = tuple(str(action) for action in (valid_actions or DEFAULT_VALID_ACTIONS))
     fallback = default_action or DEFAULT_ACTION
@@ -242,22 +256,36 @@ def parse_action_single(
     if m:
         action = _match_action_token(m.group(1), actions)
         if action is not None:
-            return action
+            return action, True
 
     m = re.search(r"`\s*([\w-]+)\s*`", lm_output)
     if m:
         action = _match_action_token(m.group(1), actions)
         if action is not None:
-            return action
+            return action, True
 
     for line in reversed(lm_output.strip().split("\n")):
         for action in sorted(actions, key=len, reverse=True):
             pattern = r"\b" + re.escape(action) + r"\b"
             if re.search(pattern, line, re.IGNORECASE):
-                return action
+                return action, True
 
     print(f"[Warning] Could not parse action; using fallback '{fallback}'.")
-    return fallback
+    return fallback, False
+
+
+def parse_action_single(
+    lm_output: str,
+    valid_actions=None,
+    default_action: str | None = None,
+) -> str:
+    """Extract one action from the LM's output, falling back on parse failure."""
+    action, _ = parse_action_single_with_status(
+        lm_output,
+        valid_actions=valid_actions,
+        default_action=default_action,
+    )
+    return action
 
 
 # ----------------------------------------------------------------------

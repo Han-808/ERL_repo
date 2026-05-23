@@ -46,7 +46,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from common import build_client, call_lm, parse_action_single
+from common import build_client, call_lm, parse_action_single_with_status
 from environments.frozen_lake import FrozenLake
 from environments.sokoban import Sokoban
 from methods.notebook_minimal import (
@@ -303,8 +303,14 @@ def run_fixed_notebook_game(
                 "LM returned empty output. Check --server/model, or pass "
                 "--allow-empty-lm-output to keep existing fallback behavior."
             )
-        action = parse_action_single(lm_output)
-        _, feedback, reward, done = env.step([action])
+        action, parsed_ok = parse_action_single_with_status(lm_output)
+        _, feedback, raw_reward, done = env.step([action])
+        reward = raw_reward if parsed_ok else 0
+        if not parsed_ok:
+            feedback = (
+                f"Action parse failed; fallback action '{action}' was "
+                f"executed, but counted reward is 0. {feedback}"
+            )
 
         actions.append(action)
         feedbacks.append(feedback)
@@ -315,7 +321,9 @@ def run_fixed_notebook_game(
                 "prompt_hash": sha256_text(prompt),
                 "lm_output": lm_output,
                 "action": action,
+                "action_parse_failed": not parsed_ok,
                 "feedback": feedback,
+                "raw_env_reward": raw_reward,
                 "reward_after_step": reward,
                 "done": done,
                 "empty_lm_output": not bool(lm_output.strip()),

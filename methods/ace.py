@@ -18,6 +18,7 @@ Sections referenced below:
 import difflib
 import json
 import re
+import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -29,7 +30,7 @@ from common import (
     default_action_for_env,
     env_metadata,
     format_action_set,
-    parse_action_single,
+    parse_action_single_with_status,
     render_template,
     success_from_reward,
     summarize_logs,
@@ -351,18 +352,54 @@ def _extract_generator_playbook_ids(lm_output: str, valid_ids: set) -> list:
     return sorted(found)
 
 
+_TRACE_PROMPT_HEAD_STEPS = 12
+_TRACE_PROMPT_TAIL_STEPS = 24
+_TRACE_PROMPT_RAW_CHARS = 360
+_TRACE_PROMPT_FEEDBACK_CHARS = 240
+
+
+def _truncate_for_prompt(value, max_chars: int) -> str:
+    text = "" if value is None else str(value)
+    if len(text) <= max_chars:
+        return text
+    omitted = len(text) - max_chars
+    return f"{text[:max_chars]}\n...[truncated {omitted} chars]"
+
+
+def _prompt_trace_steps(step_traces: list) -> list:
+    max_steps = _TRACE_PROMPT_HEAD_STEPS + _TRACE_PROMPT_TAIL_STEPS
+    if len(step_traces) <= max_steps:
+        return list(step_traces)
+    omitted = len(step_traces) - max_steps
+    return (
+        list(step_traces[:_TRACE_PROMPT_HEAD_STEPS])
+        + [{"omitted_steps": omitted}]
+        + list(step_traces[-_TRACE_PROMPT_TAIL_STEPS:])
+    )
+
+
 def _format_generator_trace(step_traces: list) -> str:
     if not step_traces:
         return "(no generator trace captured)"
 
     chunks = []
-    for tr in step_traces:
+    for tr in _prompt_trace_steps(step_traces):
+        if "omitted_steps" in tr:
+            chunks.append(
+                f"... {tr['omitted_steps']} middle generator steps omitted "
+                "from this updater prompt; full trace is kept in the result log."
+            )
+            continue
         ids = tr.get("playbook_ids", [])
         ids_text = ids if ids else "none"
         chunks.append(
             f"Step {tr.get('step')} action: {tr.get('action')}\n"
             f"Referenced playbook ids: {ids_text}\n"
-            f"Generator raw output:\n{tr.get('raw_output', '')}"
+            f"Reward: {tr.get('reward')} Done: {tr.get('done')}\n"
+            f"Feedback: "
+            f"{_truncate_for_prompt(tr.get('feedback', ''), _TRACE_PROMPT_FEEDBACK_CHARS)}\n"
+            "Generator raw output excerpt:\n"
+            f"{_truncate_for_prompt(tr.get('raw_output', ''), _TRACE_PROMPT_RAW_CHARS)}"
         )
     return "\n\n---\n\n".join(chunks)
 
@@ -658,27 +695,37 @@ class ACEMethod(BaseMethod):
         while not self.env.done:
             step_index = len(all_actions) + 1
             obs = self.env.get_observation()
+            lm_started = time.time()
             lm_out = call_lm(
                 self.client, self.model, build_step_prompt(obs),
                 disable_thinking=self.disable_thinking,
             )
-            action = parse_action_single(
+            lm_elapsed = time.time() - lm_started
+            action, parsed_ok = parse_action_single_with_status(
                 lm_out,
                 valid_actions=valid_actions,
                 default_action=default_action,
             )
             all_actions.append(action)
-            _, step_feedback, reward, done = self.env.step([action])
+            _, step_feedback, raw_reward, done = self.env.step([action])
+            reward = raw_reward if parsed_ok else 0
+            if not parsed_ok:
+                step_feedback = (
+                    f"Action parse failed; fallback action '{action}' was "
+                    f"executed, but counted reward is 0. {step_feedback}"
+                )
             all_feedbacks.append(step_feedback)
             generator_traces.append({
                 "step": step_index,
                 "observation": obs,
                 "action": action,
+                "action_parse_failed": not parsed_ok,
                 "playbook_ids": _extract_generator_playbook_ids(
                     lm_out, {it.id for it in self.playbook.items}
                 ),
                 "raw_output": lm_out,
                 "feedback": step_feedback,
+                "raw_env_reward": raw_reward,
                 "reward": reward,
                 "done": done,
             })
@@ -688,12 +735,18 @@ class ACEMethod(BaseMethod):
                 "valid_actions": list(valid_actions),
                 "llm_output": lm_out,
                 "action": action,
+                "action_parse_failed": not parsed_ok,
                 "feedback": step_feedback,
+                "raw_env_reward": raw_reward,
                 "reward": reward,
                 "done": done,
                 "context_type": "playbook",
                 "playbook_before_step": self.playbook.to_dict(),
             })
+            print(
+                f"[ACE generator] step={step_index} action={action} "
+                f"reward={reward} done={done} lm={lm_elapsed:.1f}s"
+            )
             if done:
                 break
 

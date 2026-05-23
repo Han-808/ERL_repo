@@ -8,6 +8,7 @@ ace_once structure while replacing code-task inputs with FrozenLake/Sokoban
 trajectory inputs.
 """
 
+import time
 from dataclasses import asdict
 
 from common import (
@@ -244,6 +245,33 @@ Output ONLY a valid JSON object with these exact fields (no markdown, no code bl
 }"""
 
 
+def _truncate_middle_for_prompt(value, max_chars: int) -> str:
+    text = "" if value is None else str(value)
+    if len(text) <= max_chars:
+        return text
+    keep_head = max_chars // 2
+    keep_tail = max_chars - keep_head
+    omitted = len(text) - max_chars
+    return (
+        f"{text[:keep_head]}\n"
+        f"...[truncated {omitted} middle chars; full value kept in result log]...\n"
+        f"{text[-keep_tail:]}"
+    )
+
+
+def _format_actions_for_prompt(actions: list, max_items: int = 120) -> str:
+    if len(actions) <= max_items:
+        return str(actions)
+    head_count = max_items // 2
+    tail_count = max_items - head_count
+    omitted = len(actions) - max_items
+    return (
+        f"{actions[:head_count]} "
+        f"...[{omitted} middle actions omitted]... "
+        f"{actions[-tail_count:]}"
+    )
+
+
 def build_merged_prompt(
     observation: str,
     actions: list,
@@ -260,8 +288,8 @@ def build_merged_prompt(
     return render_template(
         MERGED_PROMPT,
         observation=observation,
-        actions=actions,
-        feedback=feedback,
+        actions=_format_actions_for_prompt(actions),
+        feedback=_truncate_middle_for_prompt(feedback, 24000),
         reward=reward,
         generator_trace=generator_trace,
         current_playbook=playbook.to_prompt_string(),
@@ -298,9 +326,11 @@ def run_merged_reflector_curator(
         total_samples=total_samples,
         valid_actions=valid_actions,
     )
+    lm_started = time.time()
     raw = call_lm(
         lm_client, model, prompt, disable_thinking=disable_thinking
     )
+    print(f"[ACEOnce updater] lm={time.time() - lm_started:.1f}s")
     print(f"\n[ACEOnce raw]\n{raw}")
     reflection = _normalize_reflection(raw)
     deltas = _parse_delta_items(raw)

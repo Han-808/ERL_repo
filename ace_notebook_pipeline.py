@@ -13,7 +13,7 @@ from environments.frozen_lake import FrozenLake
 from environments.sokoban import Sokoban
 from ace.notebook import Notebook
 from ace.notebook_updater import call_notebook_updater
-from common import build_client, parse_action_single
+from common import build_client, parse_action_single_with_status
 
 
 _VALID_ACTIONS = {"Up", "Down", "Left", "Right"}
@@ -132,9 +132,15 @@ class ACENotebookPipeline:
         while not self.env.done:
             obs = self.env.get_observation()
             lm_out = self._call_lm(build_step_prompt(obs))
-            action = parse_action_single(lm_out)
+            action, parsed_ok = parse_action_single_with_status(lm_out)
             all_actions.append(action)
-            _, step_feedback, reward, done = self.env.step([action])
+            _, step_feedback, raw_reward, done = self.env.step([action])
+            reward = raw_reward if parsed_ok else 0
+            if not parsed_ok:
+                step_feedback = (
+                    f"Action parse failed; fallback action '{action}' was "
+                    f"executed, but counted reward is 0. {step_feedback}"
+                )
             all_feedbacks.append(step_feedback)
             if done:
                 break
