@@ -7,6 +7,24 @@ results_*.json
 .claude/
 outputs/
 minigrid/
+logs/
+runs/
+single_turn_passk_runs/
+export/
+llm_calls_*.jsonl
+
+# Local archives and experiment downloads.
+*.zip
+*.tar.gz
+*.tgz
+
+# Local MiniGrid visualization/audit artifacts.
+minigrid_k40_ordered_outputs/
+minigrid_original_reward/
+minigrid_k40_action_output_audit.csv
+organize_minigrid_k40_outputs.py
+plot_minigrid_k40_accuracy.py
+plot_minigrid_original_reward.py
 
 # Local analysis/download artifacts.
 latest_y8z20_analysis_extract/

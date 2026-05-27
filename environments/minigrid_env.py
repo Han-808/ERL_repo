@@ -31,11 +31,21 @@ class MiniGridTextEnv:
         3: "up",
     }
 
-    def __init__(self, env_id: str = "MiniGrid-Empty-5x5-v0", seed: int = 0):
+    def __init__(
+        self,
+        env_id: str = "MiniGrid-Empty-5x5-v0",
+        seed: int = 0,
+        max_steps: int | None = None,
+        seed_offset: int = 0,
+    ):
         self.env_id = env_id
         self._master_seed = seed
-        self._current_seed = seed
+        self._seed_offset = int(seed_offset)
+        self._current_seed = seed + self._seed_offset
+        self._max_steps_override = int(max_steps) if max_steps is not None else None
         self._env = gym.make(env_id, render_mode=None)
+        if self._max_steps_override is not None:
+            self._base_env().max_steps = self._max_steps_override
         self._last_obs: dict[str, Any] | None = None
         self._last_info: dict[str, Any] = {}
         self.done = False
@@ -49,7 +59,7 @@ class MiniGridTextEnv:
         so callers can replay the current task layout.
         """
         if seed is not None:
-            self._current_seed = seed
+            self._current_seed = seed + self._seed_offset
         obs, info = self._env.reset(seed=self._current_seed)
         self._last_obs = obs
         self._last_info = info
@@ -65,10 +75,17 @@ class MiniGridTextEnv:
         direction = self._DIR_NAMES.get(int(base.agent_dir), str(base.agent_dir))
         carrying = self._format_carrying(getattr(base, "carrying", None))
         grid = self._render_agent_view(self._last_obs["image"])
+        reward_rules = self._reward_rules()
 
         return (
             f"Environment: {self.env_id}\n"
             f"Mission: {mission}\n"
+            f"Reward rules: {reward_rules}\n"
+            f"Interface notes: left/right turn the agent in place, not lateral moves; "
+            f"forward moves into the cell directly in front of the agent; "
+            f"the agent-view grid is egocentric with the agent at bottom-center; "
+            f"the cell directly above 'agent' is the forward cell; "
+            f"unseen means not observed yet.\n"
             f"Direction: {direction}\n"
             f"Carrying: {carrying}\n\n"
             f"Agent-view grid (native partial observation):\n{grid}\n\n"
@@ -149,6 +166,16 @@ class MiniGridTextEnv:
         base = self._base_env()
         direction = self._DIR_NAMES.get(int(base.agent_dir), str(base.agent_dir))
         return f"position={tuple(base.agent_pos)}, direction={direction}"
+
+    def _reward_rules(self):
+        success = (
+            "Original MiniGrid reward is 1 - 0.9 * "
+            "(step_count / max_steps) for success, so faster success is better; "
+            "failure or timeout gives 0."
+        )
+        if "Dynamic-Obstacles" in self.env_id:
+            return success + " Colliding with an obstacle gives -1 and ends the episode."
+        return success
 
     def _format_carrying(self, obj):
         if obj is None:

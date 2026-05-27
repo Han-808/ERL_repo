@@ -90,7 +90,11 @@ def minigrid_output_label(env_id: str) -> str:
 def build_env(env_name: str, args):
     if env_name == "minigrid":
         from environments.minigrid_env import MiniGridTextEnv
-        return MiniGridTextEnv(args.minigrid_id)
+        return MiniGridTextEnv(
+            args.minigrid_id,
+            max_steps=args.minigrid_max_steps,
+            seed_offset=args.seed_offset,
+        )
     return ENVS[env_name]()
 
 
@@ -144,6 +148,24 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Gymnasium MiniGrid id to use when --env minigrid "
             "(default: MiniGrid-Empty-5x5-v0)."
+        ),
+    )
+    parser.add_argument(
+        "--minigrid-max-steps",
+        type=int,
+        default=None,
+        help=(
+            "Override MiniGrid max_steps when --env minigrid. "
+            "Default keeps the environment's built-in limit."
+        ),
+    )
+    parser.add_argument(
+        "--seed-offset",
+        type=int,
+        default=0,
+        help=(
+            "Offset added to per-episode environment seeds. "
+            "Useful for independent repeated MiniGrid runs."
         ),
     )
     parser.add_argument(
