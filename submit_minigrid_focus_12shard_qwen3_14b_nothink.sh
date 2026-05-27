@@ -60,52 +60,52 @@ DRY_RUN=0
 load_groups() {
   local gpu_kind="$1"
   local task_id="$2"
-  GROUPS=()
+  RUN_GROUPS=()
 
   case "${gpu_kind}:${task_id}" in
     a100:0)
-      GROUPS+=("ace_once_minigrid|MiniGrid-SimpleCrossingS9N3-v0|20|324|minigrid_simplecrossings9n3")
+      RUN_GROUPS+=("ace_once_minigrid|MiniGrid-SimpleCrossingS9N3-v0|20|324|minigrid_simplecrossings9n3")
       ;;
     a100:1)
-      GROUPS+=("notebook_minimal_mechanism_minigrid|MiniGrid-MemoryS13-v0|30|592|minigrid_memorys13")
+      RUN_GROUPS+=("notebook_minimal_mechanism_minigrid|MiniGrid-MemoryS13-v0|30|592|minigrid_memorys13")
       ;;
     a100:2)
-      GROUPS+=("ace_once_minigrid|MiniGrid-MemoryS13-v0|30|592|minigrid_memorys13")
+      RUN_GROUPS+=("ace_once_minigrid|MiniGrid-MemoryS13-v0|30|592|minigrid_memorys13")
       ;;
 
     l40s:0)
-      GROUPS+=("notebook_minimal_minigrid|MiniGrid-MemoryS13-v0|30|592|minigrid_memorys13")
+      RUN_GROUPS+=("notebook_minimal_minigrid|MiniGrid-MemoryS13-v0|30|592|minigrid_memorys13")
       ;;
     l40s:1)
-      GROUPS+=("notebook_minimal_mechanism_minigrid|MiniGrid-SimpleCrossingS9N3-v0|20|324|minigrid_simplecrossings9n3")
+      RUN_GROUPS+=("notebook_minimal_mechanism_minigrid|MiniGrid-SimpleCrossingS9N3-v0|20|324|minigrid_simplecrossings9n3")
       ;;
     l40s:2)
-      GROUPS+=("ace_once_minigrid|MiniGrid-MemoryS11-v0|40|303|minigrid_memorys11")
+      RUN_GROUPS+=("ace_once_minigrid|MiniGrid-MemoryS11-v0|40|303|minigrid_memorys11")
       ;;
 
     l40:0)
-      GROUPS+=("ace_once_minigrid|MiniGrid-Empty-Random-5x5-v0|40|100|minigrid_empty_random_5x5")
+      RUN_GROUPS+=("ace_once_minigrid|MiniGrid-Empty-Random-5x5-v0|40|100|minigrid_empty_random_5x5")
       ;;
     l40:1)
-      GROUPS+=("notebook_minimal_minigrid|MiniGrid-SimpleCrossingS9N3-v0|20|324|minigrid_simplecrossings9n3")
-      GROUPS+=("notebook_minimal_minigrid|MiniGrid-DistShift1-v0|20|227|minigrid_distshift1")
+      RUN_GROUPS+=("notebook_minimal_minigrid|MiniGrid-SimpleCrossingS9N3-v0|20|324|minigrid_simplecrossings9n3")
+      RUN_GROUPS+=("notebook_minimal_minigrid|MiniGrid-DistShift1-v0|20|227|minigrid_distshift1")
       ;;
     l40:2)
-      GROUPS+=("notebook_minimal_mechanism_minigrid|MiniGrid-MemoryS11-v0|40|303|minigrid_memorys11")
-      GROUPS+=("notebook_minimal_mechanism_minigrid|MiniGrid-FourRooms-v0|20|90|minigrid_fourrooms")
+      RUN_GROUPS+=("notebook_minimal_mechanism_minigrid|MiniGrid-MemoryS11-v0|40|303|minigrid_memorys11")
+      RUN_GROUPS+=("notebook_minimal_mechanism_minigrid|MiniGrid-FourRooms-v0|20|90|minigrid_fourrooms")
       ;;
     l40:3)
-      GROUPS+=("notebook_minimal_minigrid|MiniGrid-MemoryS11-v0|40|303|minigrid_memorys11")
-      GROUPS+=("notebook_minimal_minigrid|MiniGrid-FourRooms-v0|20|90|minigrid_fourrooms")
+      RUN_GROUPS+=("notebook_minimal_minigrid|MiniGrid-MemoryS11-v0|40|303|minigrid_memorys11")
+      RUN_GROUPS+=("notebook_minimal_minigrid|MiniGrid-FourRooms-v0|20|90|minigrid_fourrooms")
       ;;
     l40:4)
-      GROUPS+=("notebook_minimal_mechanism_minigrid|MiniGrid-Empty-Random-5x5-v0|40|100|minigrid_empty_random_5x5")
-      GROUPS+=("notebook_minimal_minigrid|MiniGrid-Empty-Random-5x5-v0|40|100|minigrid_empty_random_5x5")
-      GROUPS+=("notebook_minimal_mechanism_minigrid|MiniGrid-DistShift1-v0|20|227|minigrid_distshift1")
+      RUN_GROUPS+=("notebook_minimal_mechanism_minigrid|MiniGrid-Empty-Random-5x5-v0|40|100|minigrid_empty_random_5x5")
+      RUN_GROUPS+=("notebook_minimal_minigrid|MiniGrid-Empty-Random-5x5-v0|40|100|minigrid_empty_random_5x5")
+      RUN_GROUPS+=("notebook_minimal_mechanism_minigrid|MiniGrid-DistShift1-v0|20|227|minigrid_distshift1")
       ;;
     l40:5)
-      GROUPS+=("ace_once_minigrid|MiniGrid-FourRooms-v0|20|90|minigrid_fourrooms")
-      GROUPS+=("ace_once_minigrid|MiniGrid-DistShift1-v0|20|227|minigrid_distshift1")
+      RUN_GROUPS+=("ace_once_minigrid|MiniGrid-FourRooms-v0|20|90|minigrid_fourrooms")
+      RUN_GROUPS+=("ace_once_minigrid|MiniGrid-DistShift1-v0|20|227|minigrid_distshift1")
       ;;
     *)
       echo "ERROR: no group assignment for ${gpu_kind}:${task_id}" >&2
@@ -159,7 +159,7 @@ setup_hyak_env() {
 
 smoke_group_envs() {
   local record method env_id episodes max_steps env_label
-  for record in "${GROUPS[@]}"; do
+  for record in "${RUN_GROUPS[@]}"; do
     IFS='|' read -r method env_id episodes max_steps env_label <<< "${record}"
     "${UV}" run python -c \
       "import sys; from environments.minigrid_env import MiniGridTextEnv; env=MiniGridTextEnv(sys.argv[1], max_steps=int(sys.argv[2])); obs=env.reset(seed=1); assert f'Step: 0/{sys.argv[2]}' in obs, obs; env.close(); print(f'MiniGrid smoke ok: {sys.argv[1]} max_steps={sys.argv[2]}')" \
@@ -203,7 +203,7 @@ run_worker() {
   mkdir -p "${LOG_DIR}" "${OUTPUTS_ROOT}"
 
   load_groups "${gpu_kind}" "${task_id}"
-  if [[ "${#GROUPS[@]}" -eq 0 ]]; then
+  if [[ "${#RUN_GROUPS[@]}" -eq 0 ]]; then
     echo "ERROR: empty group assignment for ${gpu_kind}:${task_id}" >&2
     exit 1
   fi
@@ -221,7 +221,7 @@ run_worker() {
   echo "Seed stride: ${SEED_STRIDE}"
   echo "Port: ${port}"
   echo "Assignments:"
-  printf '  %s\n' "${GROUPS[@]}"
+  printf '  %s\n' "${RUN_GROUPS[@]}"
 
   printf "group_index\tmethod\tenv_id\trepeat\tepisodes\tmax_steps\tseed_offset\tstatus\toutputs_dir\n" > "${shard_status}"
 
@@ -251,7 +251,7 @@ run_worker() {
 
   local group_index=0
   local record method env_id episodes max_steps env_label repeat seed_offset run_label outputs_dir
-  for record in "${GROUPS[@]}"; do
+  for record in "${RUN_GROUPS[@]}"; do
     IFS='|' read -r method env_id episodes max_steps env_label <<< "${record}"
     for repeat in $(seq 1 "${REPEATS}"); do
       seed_offset=$(((repeat - 1) * SEED_STRIDE))
@@ -299,7 +299,7 @@ print_assignments() {
     for task in $(seq 0 "${max_task}"); do
       load_groups "${gpu_kind}" "${task}"
       echo "=== ${gpu_kind}:${task} ==="
-      for record in "${GROUPS[@]}"; do
+      for record in "${RUN_GROUPS[@]}"; do
         echo "${record}"
       done
     done
