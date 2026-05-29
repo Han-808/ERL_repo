@@ -7,6 +7,8 @@ results_*.json
 .claude/
 outputs/
 minigrid/
+minigrid-3/
+minigrid_sft/
 logs/
 runs/
 single_turn_passk_runs/
