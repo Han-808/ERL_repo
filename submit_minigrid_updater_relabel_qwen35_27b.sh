@@ -65,6 +65,9 @@ setup_hyak_env() {
   export NO_PROXY=localhost,127.0.0.1
   export no_proxy=localhost,127.0.0.1
 
+  # Hyak's lmod init can reference Slurm-only variables on login nodes.
+  # Keep nounset for our script, but disable it while initializing modules.
+  set +u
   if [[ -f /etc/profile.d/lmod.sh ]]; then
     # shellcheck disable=SC1091
     source /etc/profile.d/lmod.sh
@@ -78,6 +81,7 @@ setup_hyak_env() {
 
   module load cuda/12.4.1 >/dev/null 2>&1 || true
   module load gcc/13.2.0 >/dev/null 2>&1 || true
+  set -u
 
   export CUDA_HOME=/sw/cuda/12.4.1
   export CUDA_PATH=/sw/cuda/12.4.1
