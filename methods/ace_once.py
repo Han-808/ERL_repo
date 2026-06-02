@@ -34,6 +34,9 @@ from methods.ace import (
 )
 
 
+ACE_ONCE_UPDATER_MAX_TOKENS = 8192
+
+
 MERGED_PROMPT = """\
 You are an expert grid-navigation agent, educator, and knowledge curator. \
 Your job has two parts, done in a single pass:
@@ -328,7 +331,11 @@ def run_merged_reflector_curator(
     )
     lm_started = time.time()
     raw = call_lm(
-        lm_client, model, prompt, disable_thinking=disable_thinking
+        lm_client,
+        model,
+        prompt,
+        disable_thinking=disable_thinking,
+        max_tokens=ACE_ONCE_UPDATER_MAX_TOKENS,
     )
     print(f"[ACEOnce updater] lm={time.time() - lm_started:.1f}s")
     print(f"\n[ACEOnce raw]\n{raw}")

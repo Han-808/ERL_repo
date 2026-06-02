@@ -140,21 +140,27 @@ def _append_lm_trace(payload: dict) -> None:
         print(f"[LM trace warning] could not write trace: {exc}")
 
 
-def call_lm(client, model: str, prompt: str,
-            disable_thinking: bool = False) -> str:
+def call_lm(
+    client,
+    model: str,
+    prompt: str,
+    disable_thinking: bool = False,
+    max_tokens: int = 512,
+) -> str:
     """
     Send a prompt to the LM and return the response text.
 
-    Identical parameters across ERL and ACE (max_tokens=512,
-    temperature=0.7). For Qwen3-style chat templates, disable_thinking sends
-    enable_thinking=False through SGLang's OpenAI-compatible API.
+    Defaults match historical generator behavior (max_tokens=512,
+    temperature=0.7). Updater-style calls can pass a larger max_tokens value.
+    For Qwen3-style chat templates, disable_thinking sends enable_thinking=False
+    through SGLang's OpenAI-compatible API.
     Returns "" on failure.
     """
     messages = [{"role": "user", "content": prompt}]
     request_kwargs = {
         "model": model,
         "messages": messages,
-        "max_tokens": 512,
+        "max_tokens": max_tokens,
         "temperature": 0.7,
     }
     if disable_thinking:
