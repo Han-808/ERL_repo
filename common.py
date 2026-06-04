@@ -146,22 +146,26 @@ def call_lm(
     prompt: str,
     disable_thinking: bool = False,
     max_tokens: int = 512,
+    temperature: float | None = None,
 ) -> str:
     """
     Send a prompt to the LM and return the response text.
 
     Defaults match historical generator behavior (max_tokens=512,
     temperature=0.7). Updater-style calls can pass a larger max_tokens value.
+    A run can override the default temperature with LM_TEMPERATURE.
     For Qwen3-style chat templates, disable_thinking sends enable_thinking=False
     through SGLang's OpenAI-compatible API.
     Returns "" on failure.
     """
     messages = [{"role": "user", "content": prompt}]
+    if temperature is None:
+        temperature = float(os.environ.get("LM_TEMPERATURE", "0.7"))
     request_kwargs = {
         "model": model,
         "messages": messages,
         "max_tokens": max_tokens,
-        "temperature": 0.7,
+        "temperature": temperature,
     }
     if disable_thinking:
         request_kwargs["extra_body"] = {
