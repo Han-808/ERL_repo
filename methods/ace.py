@@ -654,12 +654,15 @@ class ACEMethod(BaseMethod):
         env,
         model: str = "qwen3-8b",
         server_url: str = "http://LOCAL_SERVER/v1",
+        updater_model: str | None = None,
+        updater_server_url: str | None = None,
         reward_threshold: float = 1.0,
         refine_every: int = 5,
         disable_thinking: bool = False,
     ):
         self.env = env
         self.model = model
+        self.updater_model = updater_model or model
         self.reward_threshold = reward_threshold
         self.refine_every = refine_every
         self.disable_thinking = disable_thinking
@@ -668,12 +671,16 @@ class ACEMethod(BaseMethod):
         self.total_episodes = "not provided"
 
         self.client = build_client(server_url)
+        self.updater_client = build_client(updater_server_url or server_url)
 
         self.reflector_instruction = str(_INSTRUCTIONS_DIR / "instruction_reflector.md")
         self.curator_instruction = str(_INSTRUCTIONS_DIR / "instruction_curator.md")
 
         print(f"Connected to LM server at {server_url}")
         print(f"Model: {self.model}")
+        if updater_model or updater_server_url:
+            print(f"Connected to updater LM server at {updater_server_url or server_url}")
+            print(f"Updater model: {self.updater_model}")
         print("ACE Method ready.")
 
     # -- BaseMethod contract ------------------------------------------------
@@ -795,7 +802,7 @@ class ACEMethod(BaseMethod):
         print(f"[Attempt 1] Reward:   {reward1}")
 
         reflection = run_reflector(
-            self.client, self.model,
+            self.updater_client, self.updater_model,
             initial_obs, actions1, feedback1, reward1,
             _format_generator_trace(generator_trace1),
             self.playbook, self.reflector_instruction,
@@ -817,7 +824,7 @@ class ACEMethod(BaseMethod):
             )
 
         approved_deltas = run_curator(
-            self.client, self.model,
+            self.updater_client, self.updater_model,
             reflection, self.playbook, self.curator_instruction,
             current_step=episode_num,
             total_samples=self.total_episodes,

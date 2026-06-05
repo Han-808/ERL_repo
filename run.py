@@ -114,12 +114,15 @@ def run_experiment(method_name: str, env_name: str, args) -> None:
 
     method_cls, size_field, size_header = METHODS[method_name]
     env = build_env(env_name, args)
-    method = method_cls(
-        env,
-        model=args.model,
-        server_url=args.server,
-        disable_thinking=args.disable_thinking,
-    )
+    method_kwargs = {
+        "model": args.model,
+        "server_url": args.server,
+        "disable_thinking": args.disable_thinking,
+    }
+    if method_name in {"ace", "ace_once", "ace_once_minigrid"}:
+        method_kwargs["updater_model"] = args.updater_model
+        method_kwargs["updater_server_url"] = args.updater_server
+    method = method_cls(env, **method_kwargs)
     results = method.run(args.episodes)
 
     print_episode_table(
@@ -181,6 +184,20 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Base URL of an OpenAI-API-compatible inference server "
             "(e.g. SGLang); must expose /v1/chat/completions."
+        ),
+    )
+    parser.add_argument(
+        "--updater-model", type=str, default=None,
+        help=(
+            "Optional LM model for ACE/ACE_ONCE updater calls. "
+            "Defaults to --model when unset."
+        ),
+    )
+    parser.add_argument(
+        "--updater-server", type=str, default=None,
+        help=(
+            "Optional OpenAI-compatible server URL for ACE/ACE_ONCE updater "
+            "calls. Defaults to --server when unset."
         ),
     )
     parser.add_argument(

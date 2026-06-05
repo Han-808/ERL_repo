@@ -7,15 +7,18 @@ set -euo pipefail
 # ACE_ONCE merged updater calls use ACE_ONCE_UPDATER_MAX_TOKENS=8192 in
 # methods/ace_once.py.
 #
-# Topology defaults use two SGLang servers for Qwen3-14B:
-#   - one 4xA100 server with dp=4
-#   - one 2xH200 server with dp=2
+# Topology defaults use two SGLang agent servers for Qwen3.5-27B plus one
+# Qwen3-8B updater server:
+#   - one 4xA100 Qwen3.5-27B agent server with dp=4
+#   - one 2xH200 Qwen3.5-27B agent server with dp=2
+#   - one 1xL40 Qwen3-8B updater server with dp=1
 # The 36 fixed-seed stability workers are split heavy-first across both
 # servers so Memory/SimpleCrossing tasks do not create a long single-server tail.
 #
 # Stability matrix:
 #   - same MiniGrid games, fixed seed, max_steps, rewards, and method
-#   - Qwen3-14B, no-thinking, temperature=1.0
+#   - Qwen3.5-27B generator/agent, Qwen3-8B updater, no-thinking,
+#     temperature=1.0
 #   - one fixed seed per game config
 #   - each game config is repeated STABILITY_REPEATS times
 #   - MemoryS11/S13 use 20 episodes for this stability run
@@ -27,8 +30,9 @@ set -euo pipefail
 #
 # Advanced entrypoints used by Slurm:
 #   bash stability.sh --server a100
-#   bash stability.sh --worker a100
 #   bash stability.sh --server h200
+#   bash stability.sh --server updater
+#   bash stability.sh --worker a100
 #   bash stability.sh --worker h200
 
 REPO_DIR="${REPO_DIR:-/gscratch/h2lab/mohanc3/projects/ERL_repo}"
@@ -36,8 +40,12 @@ UV="${UV:-/gscratch/stf/mohanc3/uv-env/uv-bin/uv}"
 SGLANG="${SGLANG:-/mmfs1/gscratch/stf/mohanc3/.conda/envs/sglang311/bin/sglang}"
 
 ACCOUNT="${ACCOUNT:-h2lab}"
-MODEL="${MODEL:-Qwen/Qwen3-14B}"
-MODEL_TAG="${MODEL_TAG:-qwen3-14b}"
+AGENT_MODEL="${AGENT_MODEL:-${MODEL:-Qwen/Qwen3.5-27B}}"
+AGENT_MODEL_TAG="${AGENT_MODEL_TAG:-${MODEL_TAG:-qwen35-27b}}"
+UPDATER_MODEL="${UPDATER_MODEL:-Qwen/Qwen3-8B}"
+UPDATER_MODEL_TAG="${UPDATER_MODEL_TAG:-qwen3-8b}"
+MODEL="${AGENT_MODEL}"
+MODEL_TAG="${AGENT_MODEL_TAG}"
 METHOD="${METHOD:-ace_once_minigrid}"
 SEED_STRIDE="${SEED_STRIDE:-10000}"
 UPDATER_MAX_TOKENS_EXPECTED="${UPDATER_MAX_TOKENS_EXPECTED:-8192}"
@@ -45,7 +53,7 @@ STABILITY_REPEATS="${STABILITY_REPEATS:-6}"
 STABILITY_SEED="${STABILITY_SEED:-0}"
 LM_TEMPERATURE="${LM_TEMPERATURE:-1.0}"
 
-JOB_NAME_PREFIX="${JOB_NAME_PREFIX:-minigrid-stability-${MODEL_TAG}-ace-once-updater8192}"
+JOB_NAME_PREFIX="${JOB_NAME_PREFIX:-minigrid-stability-${AGENT_MODEL_TAG}-agent-${UPDATER_MODEL_TAG}-updater8192}"
 RUN_TAG="${RUN_TAG:-${JOB_NAME_PREFIX}-$(date +%Y%m%d_%H%M%S)}"
 
 LOG_DIR="${LOG_DIR:-${REPO_DIR}/logs}"
@@ -59,8 +67,8 @@ A100_PORT="${A100_PORT:-31000}"
 A100_SERVER_CPUS="${A100_SERVER_CPUS:-32}"
 A100_SERVER_MEM="${A100_SERVER_MEM:-256G}"
 A100_SERVER_TIME="${A100_SERVER_TIME:-96:00:00}"
-A100_WORKER_ARRAY="${A100_WORKER_ARRAY:-0-23}"
-A100_WORKER_MAX_CONCURRENT="${A100_WORKER_MAX_CONCURRENT:-24}"
+A100_WORKER_ARRAY="${A100_WORKER_ARRAY:-0-15}"
+A100_WORKER_MAX_CONCURRENT="${A100_WORKER_MAX_CONCURRENT:-16}"
 
 H200_PARTITION="${H200_PARTITION:-gpu-h200}"
 H200_GPU_REQUEST="${H200_GPU_REQUEST:-h200:2}"
@@ -69,8 +77,16 @@ H200_PORT="${H200_PORT:-31100}"
 H200_SERVER_CPUS="${H200_SERVER_CPUS:-24}"
 H200_SERVER_MEM="${H200_SERVER_MEM:-256G}"
 H200_SERVER_TIME="${H200_SERVER_TIME:-96:00:00}"
-H200_WORKER_ARRAY="${H200_WORKER_ARRAY:-0-11}"
-H200_WORKER_MAX_CONCURRENT="${H200_WORKER_MAX_CONCURRENT:-12}"
+H200_WORKER_ARRAY="${H200_WORKER_ARRAY:-0-19}"
+H200_WORKER_MAX_CONCURRENT="${H200_WORKER_MAX_CONCURRENT:-20}"
+
+UPDATER_PARTITION="${UPDATER_PARTITION:-gpu-l40}"
+UPDATER_GPU_REQUEST="${UPDATER_GPU_REQUEST:-l40:1}"
+UPDATER_DP_SIZE="${UPDATER_DP_SIZE:-1}"
+UPDATER_PORT="${UPDATER_PORT:-31200}"
+UPDATER_SERVER_CPUS="${UPDATER_SERVER_CPUS:-8}"
+UPDATER_SERVER_MEM="${UPDATER_SERVER_MEM:-64G}"
+UPDATER_SERVER_TIME="${UPDATER_SERVER_TIME:-96:00:00}"
 
 WORKER_PARTITION="${WORKER_PARTITION:-gpu-l40}"
 WORKER_CPUS_PER_TASK="${WORKER_CPUS_PER_TASK:-1}"
@@ -138,6 +154,7 @@ ready_file_for_pool() {
   case "$1" in
     a100) echo "${READY_DIR}/a100.url" ;;
     h200) echo "${READY_DIR}/h200.url" ;;
+    updater) echo "${READY_DIR}/updater.url" ;;
     *) echo "ERROR: unknown pool '$1'" >&2; return 1 ;;
   esac
 }
@@ -146,6 +163,7 @@ server_port_for_pool() {
   case "$1" in
     a100) echo "${A100_PORT}" ;;
     h200) echo "${H200_PORT}" ;;
+    updater) echo "${UPDATER_PORT}" ;;
     *) echo "ERROR: unknown pool '$1'" >&2; return 1 ;;
   esac
 }
@@ -154,14 +172,23 @@ server_dp_for_pool() {
   case "$1" in
     a100) echo "${A100_DP_SIZE}" ;;
     h200) echo "${H200_DP_SIZE}" ;;
+    updater) echo "${UPDATER_DP_SIZE}" ;;
+    *) echo "ERROR: unknown pool '$1'" >&2; return 1 ;;
+  esac
+}
+
+server_model_for_pool() {
+  case "$1" in
+    a100|h200) echo "${AGENT_MODEL}" ;;
+    updater) echo "${UPDATER_MODEL}" ;;
     *) echo "ERROR: unknown pool '$1'" >&2; return 1 ;;
   esac
 }
 
 base_task_count_for_pool() {
   case "$1" in
-    a100) echo 24 ;;
-    h200) echo 12 ;;
+    a100) echo 16 ;;
+    h200) echo 20 ;;
     *) echo "ERROR: unknown pool '$1'" >&2; return 1 ;;
   esac
 }
@@ -184,8 +211,8 @@ assignment_record() {
   fi
 
   case "${pool}:${task_id}" in
-    # A100 receives 24 workers. Heavy tasks are interleaved with shorter tasks
-    # so the 4-GPU server starts with useful batching immediately.
+    # A100 receives 16 workers: a mixed set with Memory/SimpleCrossing plus
+    # enough short tasks to keep the 4-GPU agent server busy.
     a100:0)  echo "MiniGrid-MemoryS11-v0|20|605|minigrid_memorys11|12021|${STABILITY_SEED}|0|0" ;;
     a100:1)  echo "MiniGrid-MemoryS11-v0|20|605|minigrid_memorys11|12021|${STABILITY_SEED}|0|1" ;;
     a100:2)  echo "MiniGrid-MemoryS11-v0|20|605|minigrid_memorys11|12021|${STABILITY_SEED}|0|2" ;;
@@ -194,36 +221,37 @@ assignment_record() {
     a100:5)  echo "MiniGrid-MemoryS13-v0|20|845|minigrid_memorys13|3976|${STABILITY_SEED}|1|2" ;;
     a100:6)  echo "MiniGrid-SimpleCrossingS9N3-v0|20|324|minigrid_simplecrossings9n3|6283|${STABILITY_SEED}|2|0" ;;
     a100:7)  echo "MiniGrid-SimpleCrossingS9N3-v0|20|324|minigrid_simplecrossings9n3|6283|${STABILITY_SEED}|2|1" ;;
-    a100:8)  echo "MiniGrid-SimpleCrossingS9N3-v0|20|324|minigrid_simplecrossings9n3|6283|${STABILITY_SEED}|2|2" ;;
-    a100:9)  echo "MiniGrid-Empty-Random-5x5-v0|40|100|minigrid_empty_random_5x5|1820|${STABILITY_SEED}|3|0" ;;
-    a100:10) echo "MiniGrid-Empty-Random-5x5-v0|40|100|minigrid_empty_random_5x5|1820|${STABILITY_SEED}|3|1" ;;
-    a100:11) echo "MiniGrid-Empty-Random-5x5-v0|40|100|minigrid_empty_random_5x5|1820|${STABILITY_SEED}|3|2" ;;
-    a100:12) echo "MiniGrid-Empty-Random-5x5-v0|40|100|minigrid_empty_random_5x5|1820|${STABILITY_SEED}|3|3" ;;
-    a100:13) echo "MiniGrid-Empty-Random-5x5-v0|40|100|minigrid_empty_random_5x5|1820|${STABILITY_SEED}|3|4" ;;
-    a100:14) echo "MiniGrid-Empty-Random-5x5-v0|40|100|minigrid_empty_random_5x5|1820|${STABILITY_SEED}|3|5" ;;
-    a100:15) echo "MiniGrid-FourRooms-v0|20|100|minigrid_fourrooms|1740|${STABILITY_SEED}|4|0" ;;
-    a100:16) echo "MiniGrid-FourRooms-v0|20|100|minigrid_fourrooms|1740|${STABILITY_SEED}|4|1" ;;
-    a100:17) echo "MiniGrid-FourRooms-v0|20|100|minigrid_fourrooms|1740|${STABILITY_SEED}|4|2" ;;
-    a100:18) echo "MiniGrid-FourRooms-v0|20|100|minigrid_fourrooms|1740|${STABILITY_SEED}|4|3" ;;
-    a100:19) echo "MiniGrid-FourRooms-v0|20|100|minigrid_fourrooms|1740|${STABILITY_SEED}|4|4" ;;
-    a100:20) echo "MiniGrid-FourRooms-v0|20|100|minigrid_fourrooms|1740|${STABILITY_SEED}|4|5" ;;
-    a100:21) echo "MiniGrid-DistShift1-v0|20|252|minigrid_distshift1|1551|${STABILITY_SEED}|5|0" ;;
-    a100:22) echo "MiniGrid-DistShift1-v0|20|252|minigrid_distshift1|1551|${STABILITY_SEED}|5|1" ;;
-    a100:23) echo "MiniGrid-DistShift1-v0|20|252|minigrid_distshift1|1551|${STABILITY_SEED}|5|2" ;;
+    a100:8)  echo "MiniGrid-Empty-Random-5x5-v0|40|100|minigrid_empty_random_5x5|1820|${STABILITY_SEED}|3|0" ;;
+    a100:9)  echo "MiniGrid-Empty-Random-5x5-v0|40|100|minigrid_empty_random_5x5|1820|${STABILITY_SEED}|3|1" ;;
+    a100:10) echo "MiniGrid-Empty-Random-5x5-v0|40|100|minigrid_empty_random_5x5|1820|${STABILITY_SEED}|3|2" ;;
+    a100:11) echo "MiniGrid-Empty-Random-5x5-v0|40|100|minigrid_empty_random_5x5|1820|${STABILITY_SEED}|3|3" ;;
+    a100:12) echo "MiniGrid-Empty-Random-5x5-v0|40|100|minigrid_empty_random_5x5|1820|${STABILITY_SEED}|3|4" ;;
+    a100:13) echo "MiniGrid-Empty-Random-5x5-v0|40|100|minigrid_empty_random_5x5|1820|${STABILITY_SEED}|3|5" ;;
+    a100:14) echo "MiniGrid-FourRooms-v0|20|100|minigrid_fourrooms|1740|${STABILITY_SEED}|4|0" ;;
+    a100:15) echo "MiniGrid-FourRooms-v0|20|100|minigrid_fourrooms|1740|${STABILITY_SEED}|4|1" ;;
 
-    # H200 receives the remaining Memory/SimpleCrossing/DistShift repeats.
+    # H200 receives 20 workers: more request-level parallelism plus the rest of
+    # Memory/SimpleCrossing, matching the H200 underfeeding takeaway.
     h200:0)  echo "MiniGrid-MemoryS11-v0|20|605|minigrid_memorys11|12021|${STABILITY_SEED}|0|3" ;;
     h200:1)  echo "MiniGrid-MemoryS11-v0|20|605|minigrid_memorys11|12021|${STABILITY_SEED}|0|4" ;;
     h200:2)  echo "MiniGrid-MemoryS11-v0|20|605|minigrid_memorys11|12021|${STABILITY_SEED}|0|5" ;;
     h200:3)  echo "MiniGrid-MemoryS13-v0|20|845|minigrid_memorys13|3976|${STABILITY_SEED}|1|3" ;;
     h200:4)  echo "MiniGrid-MemoryS13-v0|20|845|minigrid_memorys13|3976|${STABILITY_SEED}|1|4" ;;
     h200:5)  echo "MiniGrid-MemoryS13-v0|20|845|minigrid_memorys13|3976|${STABILITY_SEED}|1|5" ;;
-    h200:6)  echo "MiniGrid-SimpleCrossingS9N3-v0|20|324|minigrid_simplecrossings9n3|6283|${STABILITY_SEED}|2|3" ;;
-    h200:7)  echo "MiniGrid-SimpleCrossingS9N3-v0|20|324|minigrid_simplecrossings9n3|6283|${STABILITY_SEED}|2|4" ;;
-    h200:8)  echo "MiniGrid-SimpleCrossingS9N3-v0|20|324|minigrid_simplecrossings9n3|6283|${STABILITY_SEED}|2|5" ;;
-    h200:9)  echo "MiniGrid-DistShift1-v0|20|252|minigrid_distshift1|1551|${STABILITY_SEED}|5|3" ;;
-    h200:10) echo "MiniGrid-DistShift1-v0|20|252|minigrid_distshift1|1551|${STABILITY_SEED}|5|4" ;;
-    h200:11) echo "MiniGrid-DistShift1-v0|20|252|minigrid_distshift1|1551|${STABILITY_SEED}|5|5" ;;
+    h200:6)  echo "MiniGrid-SimpleCrossingS9N3-v0|20|324|minigrid_simplecrossings9n3|6283|${STABILITY_SEED}|2|2" ;;
+    h200:7)  echo "MiniGrid-SimpleCrossingS9N3-v0|20|324|minigrid_simplecrossings9n3|6283|${STABILITY_SEED}|2|3" ;;
+    h200:8)  echo "MiniGrid-SimpleCrossingS9N3-v0|20|324|minigrid_simplecrossings9n3|6283|${STABILITY_SEED}|2|4" ;;
+    h200:9)  echo "MiniGrid-SimpleCrossingS9N3-v0|20|324|minigrid_simplecrossings9n3|6283|${STABILITY_SEED}|2|5" ;;
+    h200:10) echo "MiniGrid-FourRooms-v0|20|100|minigrid_fourrooms|1740|${STABILITY_SEED}|4|2" ;;
+    h200:11) echo "MiniGrid-FourRooms-v0|20|100|minigrid_fourrooms|1740|${STABILITY_SEED}|4|3" ;;
+    h200:12) echo "MiniGrid-FourRooms-v0|20|100|minigrid_fourrooms|1740|${STABILITY_SEED}|4|4" ;;
+    h200:13) echo "MiniGrid-FourRooms-v0|20|100|minigrid_fourrooms|1740|${STABILITY_SEED}|4|5" ;;
+    h200:14) echo "MiniGrid-DistShift1-v0|20|252|minigrid_distshift1|1551|${STABILITY_SEED}|5|0" ;;
+    h200:15) echo "MiniGrid-DistShift1-v0|20|252|minigrid_distshift1|1551|${STABILITY_SEED}|5|1" ;;
+    h200:16) echo "MiniGrid-DistShift1-v0|20|252|minigrid_distshift1|1551|${STABILITY_SEED}|5|2" ;;
+    h200:17) echo "MiniGrid-DistShift1-v0|20|252|minigrid_distshift1|1551|${STABILITY_SEED}|5|3" ;;
+    h200:18) echo "MiniGrid-DistShift1-v0|20|252|minigrid_distshift1|1551|${STABILITY_SEED}|5|4" ;;
+    h200:19) echo "MiniGrid-DistShift1-v0|20|252|minigrid_distshift1|1551|${STABILITY_SEED}|5|5" ;;
     *) echo "ERROR: unknown ${pool} task_id ${task_id}" >&2; return 1 ;;
   esac
 }
@@ -276,7 +304,9 @@ print_assignments() {
   print_assignments_for_pool h200
   echo
   echo "Base configs: 6"
-  echo "Server topology: 4 x A100 dp=${A100_DP_SIZE} + 2 x H200 dp=${H200_DP_SIZE}"
+  echo "Agent model: ${AGENT_MODEL}"
+  echo "Updater model: ${UPDATER_MODEL}"
+  echo "Server topology: 4 x A100 agent dp=${A100_DP_SIZE} + 2 x H200 agent dp=${H200_DP_SIZE} + 1 x L40 updater dp=${UPDATER_DP_SIZE}"
   echo "A100 worker concurrency: ${A100_WORKER_ARRAY}%${A100_WORKER_MAX_CONCURRENT}"
   echo "H200 worker concurrency: ${H200_WORKER_ARRAY}%${H200_WORKER_MAX_CONCURRENT}"
   echo "Stability seed: ${STABILITY_SEED}"
@@ -347,7 +377,7 @@ wait_for_remote_server_url() {
 
 run_server() {
   local pool="$1"
-  local port dp ready_file server_log server_pid host server_url
+  local port dp model ready_file server_log server_pid host server_url
 
   cd "${REPO_DIR}"
   setup_hyak_env
@@ -355,20 +385,21 @@ run_server() {
 
   port="$(server_port_for_pool "${pool}")"
   dp="$(server_dp_for_pool "${pool}")"
+  model="$(server_model_for_pool "${pool}")"
   ready_file="$(ready_file_for_pool "${pool}")"
   server_log="${LOG_DIR}/${RUN_TAG}-${pool}-sglang_server.log"
   rm -f "${ready_file}"
 
   echo "Server pool: ${pool}"
   echo "Node: $(hostname)"
-  echo "Model: ${MODEL}"
+  echo "Model: ${model}"
   echo "Port: ${port}"
   echo "DP size: ${dp}"
   echo "Ready file: ${ready_file}"
   echo "Server log: ${server_log}"
 
   "${SGLANG}" serve \
-    --model-path "${MODEL}" \
+    --model-path "${model}" \
     --host 0.0.0.0 \
     --port "${port}" \
     --dp-size "${dp}" \
@@ -399,7 +430,7 @@ run_server() {
 run_worker() {
   local pool="$1"
   local task_id="${SLURM_ARRAY_TASK_ID:?SLURM_ARRAY_TASK_ID is required}"
-  local ready_file server_url seed_offset status_file run_label outputs_dir
+  local ready_file updater_ready_file server_url updater_server_url seed_offset status_file run_label outputs_dir
 
   cd "${REPO_DIR}"
   setup_hyak_env
@@ -408,11 +439,12 @@ run_worker() {
   load_worker_assignment "${pool}" "${task_id}"
   seed_offset=$((SEED * SEED_STRIDE))
   ready_file="$(ready_file_for_pool "${pool}")"
+  updater_ready_file="$(ready_file_for_pool updater)"
   status_file="${OUTPUTS_ROOT}/${RUN_TAG}-${pool}-${task_id}-status.tsv"
   run_label="${RUN_TAG}-${pool}-${task_id}-${METHOD}-${ENV_LABEL}-s${SEED}-r${REPEAT}"
   outputs_dir="${OUTPUTS_ROOT}/${run_label}"
 
-  printf "pool\ttask_id\tbase_task_id\tenv_id\tseed\trepeat\ttemperature\tepisodes\tmax_steps\tseed_offset\thistorical_gen_calls\tserver_url\tstatus\toutputs_dir\n" > "${status_file}"
+  printf "pool\ttask_id\tbase_task_id\tenv_id\tseed\trepeat\ttemperature\tepisodes\tmax_steps\tseed_offset\thistorical_gen_calls\tserver_url\tstatus\toutputs_dir\tupdater_server_url\n" > "${status_file}"
 
   echo "Worker pool: ${pool}"
   echo "Task id: ${task_id}"
@@ -421,9 +453,10 @@ run_worker() {
 
   smoke_env
   server_url="$(wait_for_remote_server_url "${ready_file}")"
+  updater_server_url="$(wait_for_remote_server_url "${updater_ready_file}")"
   mkdir -p "${outputs_dir}"
 
-  echo "Starting run server=${server_url}"
+  echo "Starting run server=${server_url} updater_server=${updater_server_url}"
   if "${UV}" run python "${REPO_DIR}/run.py" \
     --method "${METHOD}" \
     --env minigrid \
@@ -431,16 +464,18 @@ run_worker() {
     --minigrid-max-steps "${MAX_STEPS}" \
     --seed-offset "${seed_offset}" \
     --episodes "${EPISODES}" \
-    --model "${MODEL}" \
+    --model "${AGENT_MODEL}" \
     --server "${server_url}" \
+    --updater-model "${UPDATER_MODEL}" \
+    --updater-server "${updater_server_url}" \
     --outputs-dir "${outputs_dir}" \
     --disable-thinking; then
-    printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\tdone\t%s\n" \
-      "${pool}" "${task_id}" "${BASE_TASK_ID}" "${ENV_ID}" "${SEED}" "${REPEAT}" "${LM_TEMPERATURE}" "${EPISODES}" "${MAX_STEPS}" "${seed_offset}" "${HISTORICAL_GEN_CALLS}" "${server_url}" "${outputs_dir}" >> "${status_file}"
+    printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\tdone\t%s\t%s\n" \
+      "${pool}" "${task_id}" "${BASE_TASK_ID}" "${ENV_ID}" "${SEED}" "${REPEAT}" "${LM_TEMPERATURE}" "${EPISODES}" "${MAX_STEPS}" "${seed_offset}" "${HISTORICAL_GEN_CALLS}" "${server_url}" "${outputs_dir}" "${updater_server_url}" >> "${status_file}"
     echo "Done. OUTPUTS_DIR=${outputs_dir}"
   else
-    printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\tfailed\t%s\n" \
-      "${pool}" "${task_id}" "${BASE_TASK_ID}" "${ENV_ID}" "${SEED}" "${REPEAT}" "${LM_TEMPERATURE}" "${EPISODES}" "${MAX_STEPS}" "${seed_offset}" "${HISTORICAL_GEN_CALLS}" "${server_url}" "${outputs_dir}" >> "${status_file}"
+    printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\tfailed\t%s\t%s\n" \
+      "${pool}" "${task_id}" "${BASE_TASK_ID}" "${ENV_ID}" "${SEED}" "${REPEAT}" "${LM_TEMPERATURE}" "${EPISODES}" "${MAX_STEPS}" "${seed_offset}" "${HISTORICAL_GEN_CALLS}" "${server_url}" "${outputs_dir}" "${updater_server_url}" >> "${status_file}"
     echo "ERROR: run failed. OUTPUTS_DIR=${outputs_dir}" >&2
     return 1
   fi
@@ -451,13 +486,17 @@ script_path() {
 }
 
 slurm_exports() {
-  printf "ALL,REPO_DIR=%s,UV=%s,SGLANG=%s,RUN_TAG=%s,MODEL=%s,MODEL_TAG=%s,METHOD=%s,SEED_STRIDE=%s,STABILITY_REPEATS=%s,STABILITY_SEED=%s,LM_TEMPERATURE=%s,LOG_DIR=%s,OUTPUTS_ROOT=%s,READY_DIR=%s,A100_PORT=%s,H200_PORT=%s,A100_DP_SIZE=%s,H200_DP_SIZE=%s,SGLANG_MEM_FRACTION=%s,SERVER_READY_WAIT_SECONDS=%s,WORKER_READY_WAIT_SECONDS=%s,READY_POLL_SECONDS=%s,UPDATER_MAX_TOKENS_EXPECTED=%s" \
+  printf "ALL,REPO_DIR=%s,UV=%s,SGLANG=%s,RUN_TAG=%s,MODEL=%s,MODEL_TAG=%s,AGENT_MODEL=%s,AGENT_MODEL_TAG=%s,UPDATER_MODEL=%s,UPDATER_MODEL_TAG=%s,METHOD=%s,SEED_STRIDE=%s,STABILITY_REPEATS=%s,STABILITY_SEED=%s,LM_TEMPERATURE=%s,LOG_DIR=%s,OUTPUTS_ROOT=%s,READY_DIR=%s,A100_PORT=%s,H200_PORT=%s,UPDATER_PORT=%s,A100_DP_SIZE=%s,H200_DP_SIZE=%s,UPDATER_DP_SIZE=%s,SGLANG_MEM_FRACTION=%s,SERVER_READY_WAIT_SECONDS=%s,WORKER_READY_WAIT_SECONDS=%s,READY_POLL_SECONDS=%s,UPDATER_MAX_TOKENS_EXPECTED=%s" \
     "${REPO_DIR}" \
     "${UV}" \
     "${SGLANG}" \
     "${RUN_TAG}" \
     "${MODEL}" \
     "${MODEL_TAG}" \
+    "${AGENT_MODEL}" \
+    "${AGENT_MODEL_TAG}" \
+    "${UPDATER_MODEL}" \
+    "${UPDATER_MODEL_TAG}" \
     "${METHOD}" \
     "${SEED_STRIDE}" \
     "${STABILITY_REPEATS}" \
@@ -468,8 +507,10 @@ slurm_exports() {
     "${READY_DIR}" \
     "${A100_PORT}" \
     "${H200_PORT}" \
+    "${UPDATER_PORT}" \
     "${A100_DP_SIZE}" \
     "${H200_DP_SIZE}" \
+    "${UPDATER_DP_SIZE}" \
     "${SGLANG_MEM_FRACTION}" \
     "${SERVER_READY_WAIT_SECONDS}" \
     "${WORKER_READY_WAIT_SECONDS}" \
@@ -501,6 +542,13 @@ submit_server_job() {
       cpus="${H200_SERVER_CPUS}"
       mem="${H200_SERVER_MEM}"
       time_limit="${H200_SERVER_TIME}"
+      ;;
+    updater)
+      partition="${UPDATER_PARTITION}"
+      gpu_request="${UPDATER_GPU_REQUEST}"
+      cpus="${UPDATER_SERVER_CPUS}"
+      mem="${UPDATER_SERVER_MEM}"
+      time_limit="${UPDATER_SERVER_TIME}"
       ;;
     *) echo "ERROR: unknown server pool '${pool}'" >&2; return 1 ;;
   esac
@@ -619,7 +667,8 @@ main_submit() {
   fi
 
   echo "Run tag: ${RUN_TAG}"
-  echo "Model: ${MODEL}"
+  echo "Agent model: ${AGENT_MODEL}"
+  echo "Updater model: ${UPDATER_MODEL}"
   echo "ACE_ONCE updater max_tokens: ${UPDATER_MAX_TOKENS_EXPECTED}"
   echo "Outputs root: ${OUTPUTS_ROOT}"
   echo "Ready dir: ${READY_DIR}"
@@ -643,18 +692,21 @@ main_submit() {
     echo "Dry run: not creating directories or requiring UV/SGLang executable checks."
   fi
 
-  local a100_server h200_server a100_workers h200_workers
+  local a100_server h200_server updater_server a100_workers h200_workers
   a100_server="$(submit_server_job a100)"
   h200_server="$(submit_server_job h200)"
+  updater_server="$(submit_server_job updater)"
   a100_workers="$(submit_worker_job a100)"
   h200_workers="$(submit_worker_job h200)"
   submit_cleanup_job a100 "${a100_server}" "${a100_workers}" >/dev/null
   submit_cleanup_job h200 "${h200_server}" "${h200_workers}" >/dev/null
+  submit_cleanup_job updater "${updater_server}" "${a100_workers}:${h200_workers}" >/dev/null
 
   echo
   echo "Submitted jobs:"
   echo "  a100 server: ${a100_server}"
   echo "  h200 server: ${h200_server}"
+  echo "  updater server: ${updater_server}"
   echo "  a100 workers: ${a100_workers}"
   echo "  h200 workers: ${h200_workers}"
   echo
@@ -667,7 +719,7 @@ usage() {
   cat <<EOF
 Usage:
   bash $0 [--dry-run]
-  bash $0 --server a100|h200
+  bash $0 --server a100|h200|updater
   bash $0 --worker a100|h200
 EOF
 }
@@ -703,8 +755,8 @@ done
 case "${MODE}" in
   submit) main_submit ;;
   server)
-    if [[ "${POOL}" != "a100" && "${POOL}" != "h200" ]]; then
-      echo "ERROR: --server requires a100 or h200" >&2
+    if [[ "${POOL}" != "a100" && "${POOL}" != "h200" && "${POOL}" != "updater" ]]; then
+      echo "ERROR: --server requires a100, h200, or updater" >&2
       exit 1
     fi
     run_server "${POOL}"

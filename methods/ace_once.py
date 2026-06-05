@@ -386,7 +386,7 @@ class ACEOnceMethod(ACEMethod):
         print(f"[Attempt 1] Reward:   {reward1}")
 
         reflection, approved_deltas = run_merged_reflector_curator(
-            self.client, self.model,
+            self.updater_client, self.updater_model,
             initial_obs, actions1, feedback1, reward1,
             _format_generator_trace(generator_trace1),
             self.playbook,
