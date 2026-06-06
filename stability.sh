@@ -7,17 +7,17 @@ set -euo pipefail
 # ACE_ONCE merged updater calls use ACE_ONCE_UPDATER_MAX_TOKENS=8192 in
 # methods/ace_once.py.
 #
-# Topology defaults use two SGLang agent servers for Qwen3.5-27B plus one
-# Qwen3-8B updater server:
-#   - one 4xA100 Qwen3.5-27B agent server with dp=4
-#   - one 2xH200 Qwen3.5-27B agent server with dp=2
-#   - one 1xL40 Qwen3-8B updater server with dp=1
+# Topology defaults use two SGLang agent servers for Qwen3-8B plus one
+# Qwen3.5-27B updater server:
+#   - one 4xA100 Qwen3-8B agent server with dp=4
+#   - one 2xH200 Qwen3-8B agent server with dp=2
+#   - one 2xH200 Qwen3.5-27B updater server with dp=2
 # The 36 fixed-seed stability workers are split heavy-first across both
 # servers so Memory/SimpleCrossing tasks do not create a long single-server tail.
 #
 # Stability matrix:
 #   - same MiniGrid games, fixed seed, max_steps, rewards, and method
-#   - Qwen3.5-27B generator/agent, Qwen3-8B updater, no-thinking,
+#   - Qwen3-8B generator/agent, Qwen3.5-27B updater, no-thinking,
 #     temperature=1.0
 #   - one fixed seed per game config
 #   - each game config is repeated STABILITY_REPEATS times
@@ -40,10 +40,10 @@ UV="${UV:-/gscratch/stf/mohanc3/uv-env/uv-bin/uv}"
 SGLANG="${SGLANG:-/mmfs1/gscratch/stf/mohanc3/.conda/envs/sglang311/bin/sglang}"
 
 ACCOUNT="${ACCOUNT:-h2lab}"
-AGENT_MODEL="${AGENT_MODEL:-${MODEL:-Qwen/Qwen3.5-27B}}"
-AGENT_MODEL_TAG="${AGENT_MODEL_TAG:-${MODEL_TAG:-qwen35-27b}}"
-UPDATER_MODEL="${UPDATER_MODEL:-Qwen/Qwen3-8B}"
-UPDATER_MODEL_TAG="${UPDATER_MODEL_TAG:-qwen3-8b}"
+AGENT_MODEL="${AGENT_MODEL:-${MODEL:-Qwen/Qwen3-8B}}"
+AGENT_MODEL_TAG="${AGENT_MODEL_TAG:-${MODEL_TAG:-qwen3-8b}}"
+UPDATER_MODEL="${UPDATER_MODEL:-Qwen/Qwen3.5-27B}"
+UPDATER_MODEL_TAG="${UPDATER_MODEL_TAG:-qwen35-27b}"
 MODEL="${AGENT_MODEL}"
 MODEL_TAG="${AGENT_MODEL_TAG}"
 METHOD="${METHOD:-ace_once_minigrid}"
@@ -80,12 +80,12 @@ H200_SERVER_TIME="${H200_SERVER_TIME:-96:00:00}"
 H200_WORKER_ARRAY="${H200_WORKER_ARRAY:-0-19}"
 H200_WORKER_MAX_CONCURRENT="${H200_WORKER_MAX_CONCURRENT:-20}"
 
-UPDATER_PARTITION="${UPDATER_PARTITION:-gpu-l40}"
-UPDATER_GPU_REQUEST="${UPDATER_GPU_REQUEST:-l40:1}"
-UPDATER_DP_SIZE="${UPDATER_DP_SIZE:-1}"
+UPDATER_PARTITION="${UPDATER_PARTITION:-gpu-h200}"
+UPDATER_GPU_REQUEST="${UPDATER_GPU_REQUEST:-h200:2}"
+UPDATER_DP_SIZE="${UPDATER_DP_SIZE:-2}"
 UPDATER_PORT="${UPDATER_PORT:-31200}"
-UPDATER_SERVER_CPUS="${UPDATER_SERVER_CPUS:-8}"
-UPDATER_SERVER_MEM="${UPDATER_SERVER_MEM:-64G}"
+UPDATER_SERVER_CPUS="${UPDATER_SERVER_CPUS:-24}"
+UPDATER_SERVER_MEM="${UPDATER_SERVER_MEM:-256G}"
 UPDATER_SERVER_TIME="${UPDATER_SERVER_TIME:-96:00:00}"
 
 WORKER_PARTITION="${WORKER_PARTITION:-gpu-l40}"
@@ -306,7 +306,7 @@ print_assignments() {
   echo "Base configs: 6"
   echo "Agent model: ${AGENT_MODEL}"
   echo "Updater model: ${UPDATER_MODEL}"
-  echo "Server topology: 4 x A100 agent dp=${A100_DP_SIZE} + 2 x H200 agent dp=${H200_DP_SIZE} + 1 x L40 updater dp=${UPDATER_DP_SIZE}"
+  echo "Server topology: 4 x A100 agent dp=${A100_DP_SIZE} + 2 x H200 agent dp=${H200_DP_SIZE} + 2 x H200 updater dp=${UPDATER_DP_SIZE}"
   echo "A100 worker concurrency: ${A100_WORKER_ARRAY}%${A100_WORKER_MAX_CONCURRENT}"
   echo "H200 worker concurrency: ${H200_WORKER_ARRAY}%${H200_WORKER_MAX_CONCURRENT}"
   echo "Stability seed: ${STABILITY_SEED}"

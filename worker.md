@@ -116,7 +116,8 @@ Configuration:
 | Field | Value |
 |---|---|
 | Method | `ace_once_minigrid` |
-| Model | `Qwen/Qwen3-14B` |
+| Agent / generator model | `Qwen/Qwen3-8B` |
+| Updater model | `Qwen/Qwen3.5-27B` |
 | Thinking | disabled |
 | Generator max tokens | 512 |
 | Merged updater max tokens | 8192 |
@@ -127,10 +128,11 @@ Configuration:
 | Runs | `6 x 6 = 36` |
 | Episodes | `(40 + 20 + 20 + 20 + 20 + 20) x 6 = 840` |
 | Output root | `minigrid_stability_updater8192/` |
-| Servers | `4 x A100` SGLang `dp=4` + `2 x H200` SGLang `dp=2` |
-| A100 workers | `0-23%24`, 1 CPU / 4G each |
-| H200 workers | `0-11%12`, 1 CPU / 4G each |
+| Servers | `4 x A100` Qwen3-8B agent `dp=4` + `2 x H200` Qwen3-8B agent `dp=2` + `2 x H200` Qwen3.5-27B updater `dp=2` |
+| A100 workers | `0-15%16`, 1 CPU / 4G each |
+| H200 workers | `0-19%20`, 1 CPU / 4G each |
 | Total concurrent workers | 36 |
+| Total server GPUs | `4 x A100 + 4 x H200` |
 
 Seed implementation:
 
@@ -163,9 +165,46 @@ Purpose:
 - Same episode sequence.
 - Different independent LM/method executions at `temperature=1.0`.
 - Use final reward distributions for per-game method randomness, e.g. violin plots.
-- Default submission uses both pools: one 4xA100 server plus one 2xH200 server.
-- The 36 fixed-seed runs are explicitly split across both pools. MemoryS11, MemoryS13, SimpleCrossing, and DistShift repeats are divided across A100/H200 to avoid a single slow tail.
-- This gives 6 concurrent workers per GPU across the 4A100+2H200 topology, which is a better fit for Qwen3-14B than the earlier 4-repeat plan.
+- Previous submitted split-model run accidentally used `Qwen3.5-27B` as the agent and `Qwen3-8B` as the updater. Its data is still usable, but it is not the intended role split.
+- The intended default submission uses three servers: one 4xA100 Qwen3-8B agent server, one 2xH200 Qwen3-8B agent server, and one 2xH200 Qwen3.5-27B updater server.
+- The 36 fixed-seed runs are explicitly split across the two agent pools. MemoryS11, MemoryS13, SimpleCrossing, FourRooms, and DistShift repeats are divided across A100/H200 to avoid a single slow tail.
+- The updated split is 16 A100 workers and 20 H200 workers. This keeps A100 conservative while giving H200 the higher request-level parallelism suggested by the previous utilization check.
+
+Observed early utilization for the earlier Qwen3-14B single-model stability run:
+
+```text
+A100 server: 4 x A100, 24 workers total, 6 workers/GPU
+GPU utilization: about 87-93%
+
+H200 server: 2 x H200, 12 workers total, 6 workers/GPU
+GPU utilization: about 39-46%
+```
+
+Takeaway:
+
+- `6 workers/GPU` is enough to keep A100 very busy for Qwen3-14B in this online MiniGrid loop.
+- `6 workers/GPU` is still underfeeding H200 for Qwen3-14B.
+- For future 2xH200 Qwen3-14B stability-style runs, start closer to `10-12 workers/GPU` (`20-24` total H200 workers), then check `nvidia-smi`.
+- Do not change the current run midstream unless there is a clear failure; it is healthy and producing work.
+
+Progress checkpoint:
+
+```text
+runs_done=13 / 36
+DistShift: mostly done; only repeat 4 at 10/20
+Empty: all repeats active or done, roughly 62.5-100%
+FourRooms: all 6 repeats done
+MemoryS11: all repeats active, roughly 65-90%
+MemoryS13: one repeat done, remaining repeats roughly 40-75%
+SimpleCrossingS9N3: all repeats active, roughly 35-45%
+```
+
+Concurrency interpretation:
+
+- Short/easy configs drain quickly; they do not determine the tail.
+- `MemoryS11`, `MemoryS13`, and `SimpleCrossingS9N3` are the current stability-run tail.
+- Equal workers-per-GPU is not equal throughput across GPU classes. H200 needs more request-level parallelism than A100 for Qwen3-14B in this online loop.
+- Future stability runs should raise H200 worker concurrency while keeping A100 near the current level.
 
 Memory stability change:
 
@@ -454,7 +493,7 @@ For future MiniGrid ACE_ONCE SFT runs:
 
 1. Give Memory games about 2x scheduling weight.
 2. Put MemoryS11 and MemoryS13 on both A100 and H200, not just one pool.
-3. Increase H200 worker concurrency from `4 workers/GPU` to about `8-12 workers/GPU`.
+3. Increase H200 worker concurrency from `4 workers/GPU` to about `10-12 workers/GPU` for Qwen3-14B-style runs.
 4. Keep A100 around `4-6 workers/GPU`, then tune based on `nvidia-smi`.
 5. Use heavy-first ordering, but also reserve enough late capacity for Memory tails.
 6. Avoid assigning all short games first if that leaves only Memory at the end.
@@ -465,7 +504,7 @@ Suggested next default:
 | Pool | GPUs | Initial workers / GPU | Total concurrent workers |
 |---|---:|---:|---:|
 | A100 | 4 | 5-6 | 20-24 |
-| H200 | 2 | 8-12 | 16-24 |
+| H200 | 2 | 10-12 | 20-24 |
 
 If H200 utilization remains below 60%, raise H200 worker concurrency again.
 
