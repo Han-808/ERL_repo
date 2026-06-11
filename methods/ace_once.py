@@ -354,6 +354,14 @@ class ACEOnceMethod(ACEMethod):
 
     name = "ace_once"
 
+    def __init__(self, *args, ace_once_disable_updater: bool = False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ace_once_disable_updater = ace_once_disable_updater
+        if self.ace_once_disable_updater:
+            print(
+                "ACE_ONCE updater disabled: using fixed initial playbook/context."
+            )
+
     def run_episode(self, episode_num: int) -> dict:
         initial_obs = self.env.reset(seed=episode_num)
         env_info = env_metadata(self.env)
@@ -384,6 +392,49 @@ class ACEOnceMethod(ACEMethod):
         print(f"[Attempt 1] Actions:  {actions1}")
         print(f"[Attempt 1] Feedback: {feedback1}")
         print(f"[Attempt 1] Reward:   {reward1}")
+
+        if self.ace_once_disable_updater:
+            reflection = {
+                "reasoning": "",
+                "error_identification": "",
+                "root_cause_analysis": "",
+                "correct_approach": "",
+                "key_insight": "",
+                "bullet_tags": [],
+                "updater_disabled": True,
+            }
+            approved_deltas = []
+            feedback_stats = {
+                "helpful": 0,
+                "harmful": 0,
+                "neutral": 0,
+                "fallback": False,
+                "updater_disabled": True,
+            }
+            print("[ACEOnce] Updater disabled; playbook remains unchanged")
+            return {
+                "episode": episode_num,
+                "env": env_info,
+                "actions1": actions1,
+                "feedback1": feedback1,
+                "reward1": reward1,
+                "success": success_from_reward(reward1, self.reward_threshold),
+                "trajectory_events": trajectory_events,
+                "context_before_episode": {
+                    "type": "playbook",
+                    "playbook": playbook_before_episode,
+                },
+                "context_after_episode": {
+                    "type": "playbook",
+                    "playbook": self.playbook.to_dict(),
+                },
+                "generator_trace1": generator_trace1,
+                "reflection": reflection,
+                "playbook_feedback": feedback_stats,
+                "delta_items": [asdict(d) for d in approved_deltas],
+                "playbook": self.playbook.to_dict(),
+                "playbook_size": len(self.playbook.items),
+            }
 
         reflection, approved_deltas = run_merged_reflector_curator(
             self.updater_client, self.updater_model,

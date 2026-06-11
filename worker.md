@@ -213,6 +213,86 @@ Memory stability change:
 - `max_steps` stay original: `MemoryS11=605`, `MemoryS13=845`.
 - This keeps reward semantics unchanged while reducing the slow Memory tail.
 
+### 5. Stability Ablation Suite
+
+Goal:
+
+- Compare three fixed-seed ACE_ONCE stability variants without changing the game/reward protocol.
+- Reuse L40/L40S as serving GPUs for smaller models so A100/H200 stay focused on the larger generators.
+
+Script:
+
+```text
+submit_minigrid_stability_ablation_suite.sh
+```
+
+Shared configuration:
+
+| Field | Value |
+|---|---|
+| Method | `ace_once_minigrid` |
+| Thinking | disabled |
+| Generator max tokens | 512 |
+| Merged updater max tokens | 8192 |
+| Temperature | 1.0 |
+| Games | 6 focused MiniGrid games |
+| Fixed seed | `STABILITY_SEED=0` |
+| Repeats | 6 |
+| Runs per task | `6 x 6 = 36` |
+| Episodes per task | `(40 + 20 + 20 + 20 + 20 + 20) x 6 = 840` |
+| Output root | `minigrid_stability_ablation_suite/` |
+
+Task matrix:
+
+| Task | Generator | Updater | Run tag prefix |
+|---|---|---|---|
+| no-updater init context | `Qwen/Qwen3.5-27B` | disabled | `minigrid-stability-qwen35-27b-agent-no-updater-initctx-*` |
+| 4B updater | `Qwen/Qwen3.5-27B` | `Qwen/Qwen3-4B` | `minigrid-stability-qwen35-27b-agent-qwen3-4b-updater8192-*` |
+| 14B generator / 8B updater | `Qwen/Qwen3-14B` | `Qwen/Qwen3-8B` | `minigrid-stability-qwen3-14b-agent-qwen3-8b-updater8192-*` |
+
+No-updater implementation:
+
+- `run.py --ace-once-disable-updater` skips the merged updater call.
+- The playbook stays at the initialized empty ACE_ONCE state for every episode.
+- Result schema is preserved with empty updater fields and `playbook_size=0`.
+- This is not using a previous first update; it is fixed initial context throughout.
+
+Server layout:
+
+| Role | Partition | GPU request | Model | Used by |
+|---|---|---|---|---|
+| `gen27` | `gpu-h200` | `h200:2`, `dp=2` | `Qwen/Qwen3.5-27B` | no-updater + 4B-updater tasks |
+| `gen14` | `gpu-a100` | `a100:2`, `dp=2` | `Qwen/Qwen3-14B` | 14B/8B task |
+| `upd4` | `gpu-l40` | `l40:1`, `dp=1` | `Qwen/Qwen3-4B` | 4B-updater task |
+| `upd8` | `gpu-l40s` | `l40s:2`, `dp=2` | `Qwen/Qwen3-8B` | 14B/8B task |
+
+Default worker arrays:
+
+```text
+no_updater: 0-35%12
+upd4:       0-35%12
+upd8:       0-35%16
+```
+
+Expected full-run acceptance:
+
+```text
+no-updater task: 36 result runs, 840 episodes, no updater calls, playbook_size=0
+4B-updater task: 36 result runs, 840 episodes, 840 updater calls
+8B-updater task: 36 result runs, 840 episodes, 840 updater calls
+```
+
+Submit:
+
+```bash
+cd /gscratch/h2lab/mohanc3/projects/ERL_repo
+
+bash submit_minigrid_stability_ablation_suite.sh --dry-run
+
+WORKER_PARTITION=gpu-l40 \
+bash submit_minigrid_stability_ablation_suite.sh
+```
+
 ### Supporting Local Tools
 
 | Tool | Purpose |

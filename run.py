@@ -122,6 +122,8 @@ def run_experiment(method_name: str, env_name: str, args) -> None:
     if method_name in {"ace", "ace_once", "ace_once_minigrid"}:
         method_kwargs["updater_model"] = args.updater_model
         method_kwargs["updater_server_url"] = args.updater_server
+    if method_name in {"ace_once", "ace_once_minigrid"}:
+        method_kwargs["ace_once_disable_updater"] = args.ace_once_disable_updater
     method = method_cls(env, **method_kwargs)
     results = method.run(args.episodes)
 
@@ -210,6 +212,14 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Disable Qwen3 thinking via SGLang chat_template_kwargs "
             "enable_thinking=False for every LM call."
+        ),
+    )
+    parser.add_argument(
+        "--ace-once-disable-updater",
+        action="store_true",
+        help=(
+            "For ACE_ONCE methods only, skip the merged updater call and keep "
+            "the initial playbook/context fixed for the whole run."
         ),
     )
     return parser
