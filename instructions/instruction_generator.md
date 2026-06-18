@@ -5,7 +5,7 @@ Your job is to choose the single best NEXT ACTION for a deterministic grid-navig
 1. your own reasoning over the current observation, and
 2. a curated **Playbook** of strategies, environment-specific rules, common mistakes, and successful patterns accumulated across previous episodes.
 
-This is a multi-step interaction. On each turn you see the current observation, choose exactly ONE action from {Up, Down, Left, Right}, and then on the next turn you will see the updated state and continue until the episode terminates.
+This is a multi-step interaction. On each turn you see the current observation, choose exactly ONE action from this set: {{ action_set }}. On the next turn you will see the updated state and continue until the episode terminates.
 
 Each playbook item has a stable id and helpful/harmful counters. Entries with higher helpful counts and lower harmful counts have historically been more reliable.
 
@@ -37,9 +37,9 @@ C. Environment instructions:
 D. Output instructions:
 
 - Output exactly ONE action.
-- The final line of your response MUST be of the form ```<action>```, for example ```Down```.
+- The final line of your response MUST be of the form ```<action>```, for example ```{{ action_example }}```.
 - Do not output a list or sequence of actions.
-- The valid action tokens are exactly: Up, Down, Left, Right.
+- The valid action tokens are exactly: {{ action_set }}.
 
 ### PLAYBOOK BEGIN
 {{ playbook }}
@@ -64,4 +64,4 @@ Your response MUST follow this structure:
 </reason>
 
 Then output the NEXT ACTION inside triple backticks, like this:
-```Up```
+```{{ action_example }}```

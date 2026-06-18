@@ -11,6 +11,8 @@ Usage examples:
 """
 
 import argparse
+import os
+import re
 import sys
 from pathlib import Path
 
@@ -22,8 +24,17 @@ from common import print_episode_table, results_path, write_results
 from environments.frozen_lake import FrozenLake
 from environments.sokoban import Sokoban
 from methods.ace import ACEMethod
+from methods.ace_once import ACEOnceMethod, ACEOnceMiniGridMethod
 from methods.erl import ERLMethod
-from methods.notebook_minimal import NotebookMinimalMethod
+from methods.notebook_minimal import (
+    NotebookMinimalMethod,
+    NotebookMinimalMiniGridMethod,
+)
+from methods.notebook_minimal_mechanism import (
+    NotebookMinimalMechanismMethod,
+    NotebookMinimalMechanismMiniGridMethod,
+)
+from methods.notebook_minimal_thinkahead import NotebookMinimalThinkAheadMethod
 
 
 def _notebook_factory(initial_notebook):
@@ -39,10 +50,25 @@ def _notebook_factory(initial_notebook):
 METHODS = {
     "erl":                    (ERLMethod, "memory_size", "Memory Size"),
     "ace":                    (ACEMethod, "playbook_size", "Playbook Size"),
-    "notebook_minimal":       (_notebook_factory("default"),
+    "ace_once":               (ACEOnceMethod, "playbook_size", "Playbook Size"),
+    "ace_once_minigrid":      (ACEOnceMiniGridMethod, "playbook_size", "Playbook Size"),
+    "notebook_minimal":       (_notebook_factory("empty"),
                                "notebook_size", "Notebook Lines"),
     "notebook_minimal_empty": (_notebook_factory("empty"),
                                "notebook_size", "Notebook Lines"),
+    "notebook_minimal_default": (_notebook_factory("default"),
+                                 "notebook_size", "Notebook Lines"),
+    "notebook_minimal_mechanism": (NotebookMinimalMechanismMethod,
+                                   "notebook_size", "Notebook Lines"),
+    "notebook_minimal_mechanism_minigrid": (
+        NotebookMinimalMechanismMiniGridMethod,
+        "notebook_size",
+        "Notebook Lines",
+    ),
+    "notebook_minimal_minigrid": (NotebookMinimalMiniGridMethod,
+                                  "notebook_size", "Notebook Lines"),
+    "notebook_minimal_thinkahead": (NotebookMinimalThinkAheadMethod,
+                                    "notebook_size", "Notebook Lines"),
 }
 
 
@@ -52,22 +78,60 @@ ENVS = {
 }
 
 
+def minigrid_output_label(env_id: str) -> str:
+    label = env_id
+    if label.startswith("MiniGrid-"):
+        label = label[len("MiniGrid-"):]
+    label = re.sub(r"-v\d+$", "", label)
+    label = re.sub(r"[^A-Za-z0-9]+", "_", label).strip("_").lower()
+    return f"minigrid_{label or 'env'}"
+
+
+def build_env(env_name: str, args):
+    if env_name == "minigrid":
+        from environments.minigrid_env import MiniGridTextEnv
+        return MiniGridTextEnv(
+            args.minigrid_id,
+            max_steps=args.minigrid_max_steps,
+            seed_offset=args.seed_offset,
+        )
+    return ENVS[env_name]()
+
+
+def output_env_name(env_name: str, args) -> str:
+    if env_name == "minigrid":
+        return minigrid_output_label(args.minigrid_id)
+    return env_name
+
+
 def run_experiment(method_name: str, env_name: str, args) -> None:
-    method_cls, size_field, size_header = METHODS[method_name]
-    env = ENVS[env_name]()
-    method = method_cls(
-        env,
-        model=args.model,
-        server_url=args.server,
-        disable_thinking=args.disable_thinking,
+    outputs_dir = Path(args.outputs_dir)
+    env_label = output_env_name(env_name, args)
+    os.environ["LLM_TRACE_PATH"] = str(
+        outputs_dir / f"llm_calls_{method_name}_{env_label}.jsonl"
     )
+    print(f"LM traces will be saved to {os.environ['LLM_TRACE_PATH']}")
+
+    method_cls, size_field, size_header = METHODS[method_name]
+    env = build_env(env_name, args)
+    method_kwargs = {
+        "model": args.model,
+        "server_url": args.server,
+        "disable_thinking": args.disable_thinking,
+    }
+    if method_name in {"ace", "ace_once", "ace_once_minigrid"}:
+        method_kwargs["updater_model"] = args.updater_model
+        method_kwargs["updater_server_url"] = args.updater_server
+    if method_name in {"ace_once", "ace_once_minigrid"}:
+        method_kwargs["ace_once_disable_updater"] = args.ace_once_disable_updater
+    method = method_cls(env, **method_kwargs)
     results = method.run(args.episodes)
 
     print_episode_table(
         results["logs"], size_field=size_field, size_header=size_header
     )
 
-    out_path = results_path(args.outputs_dir, method_name, env_name)
+    out_path = results_path(args.outputs_dir, method_name, env_label)
     write_results(out_path, results)
     print(f"Saved to {out_path}")
 
@@ -76,11 +140,38 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run an experiment.")
     parser.add_argument(
         "--method", required=True, choices=sorted(METHODS),
-        help="Method to run (erl or ace).",
+        help="Method to run.",
     )
     parser.add_argument(
-        "--env", choices=["frozen_lake", "sokoban", "both"], default="both",
+        "--env", choices=["frozen_lake", "sokoban", "both", "minigrid"],
+        default="both",
         help="Which environment to run (default: both).",
+    )
+    parser.add_argument(
+        "--minigrid-id",
+        default="MiniGrid-Empty-5x5-v0",
+        help=(
+            "Gymnasium MiniGrid id to use when --env minigrid "
+            "(default: MiniGrid-Empty-5x5-v0)."
+        ),
+    )
+    parser.add_argument(
+        "--minigrid-max-steps",
+        type=int,
+        default=None,
+        help=(
+            "Override MiniGrid max_steps when --env minigrid. "
+            "Default keeps the environment's built-in limit."
+        ),
+    )
+    parser.add_argument(
+        "--seed-offset",
+        type=int,
+        default=0,
+        help=(
+            "Offset added to per-episode environment seeds. "
+            "Useful for independent repeated MiniGrid runs."
+        ),
     )
     parser.add_argument(
         "--episodes", type=int, default=20,
@@ -98,6 +189,20 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--updater-model", type=str, default=None,
+        help=(
+            "Optional LM model for ACE/ACE_ONCE updater calls. "
+            "Defaults to --model when unset."
+        ),
+    )
+    parser.add_argument(
+        "--updater-server", type=str, default=None,
+        help=(
+            "Optional OpenAI-compatible server URL for ACE/ACE_ONCE updater "
+            "calls. Defaults to --server when unset."
+        ),
+    )
+    parser.add_argument(
         "--outputs-dir", dest="outputs_dir", default="./outputs",
         help="Where to write results_<method>_<env>.json (default: ./outputs).",
     )
@@ -107,6 +212,14 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Disable Qwen3 thinking via SGLang chat_template_kwargs "
             "enable_thinking=False for every LM call."
+        ),
+    )
+    parser.add_argument(
+        "--ace-once-disable-updater",
+        action="store_true",
+        help=(
+            "For ACE_ONCE methods only, skip the merged updater call and keep "
+            "the initial playbook/context fixed for the whole run."
         ),
     )
     return parser

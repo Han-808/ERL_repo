@@ -6,3 +6,43 @@ results_*.json
 .env
 .claude/
 outputs/
+minigrid/
+minigrid-3/
+minigrid_sft/
+logs/
+runs/
+single_turn_passk_runs/
+export/
+llm_calls_*.jsonl
+
+# Local archives and experiment downloads.
+*.zip
+*.tar.gz
+*.tgz
+
+# Local MiniGrid visualization/audit artifacts.
+minigrid_k40_ordered_outputs/
+minigrid_original_reward/
+minigrid_k40_action_output_audit.csv
+organize_minigrid_k40_outputs.py
+plot_minigrid_k40_accuracy.py
+plot_minigrid_original_reward.py
+
+# Local analysis/download artifacts.
+latest_y8z20_analysis_extract/
+latest_y8z20_mixed_shards_visualizations/
+y8z20_full_extract/
+y8z20_state_summary_extracted/
+latest_y8z20_analysis_extract.zip
+passk-qwen3-14b-nothink-*.zip
+ablation_*/
+*_full_extract/
+*_analysis_extract/
+*_analysis_only/
+*_final_visuals/
+plot_ablation_*_svg.ps1
+
+# Large local evaluation artifacts. Keep summaries/plots in Git, but do not
+# track raw LLM call traces because GitHub rejects files over 100 MB.
+pass@k-singleturn_*/**/llm_calls_single_turn_passk_*.jsonl
+single_turn_passk_runs/**/llm_calls_single_turn_passk_*.jsonl

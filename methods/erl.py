@@ -1,7 +1,7 @@
 """
 ERL (Experiential Reinforcement Learning) method — BaseMethod-compatible.
 
-Implements the two-attempt + reflection + memory loop described in
+Implements a single-attempt + reflection + memory loop based on
 arXiv 2602.13949.  No training or gradient updates — inference only.
 
 Interaction model: the LM is called once per action step, sees the
@@ -11,23 +11,25 @@ triple backticks (e.g. ```Down```), matching the paper's Table 2 format.
 
 from common import (
     BaseMethod,
+    action_example_for_env,
     build_client,
     call_lm,
-    parse_action_single,
+    default_action_for_env,
+    parse_action_single_with_status,
     summarize_logs,
+    valid_actions_for_env,
 )
 from prompts import (
     build_attempt1_prompt,
-    build_attempt2_prompt,
     build_reflection_prompt,
 )
 
 
-_SKIPPED = "Skipped (attempt 1 succeeded)"
+_SKIPPED = "Skipped (episode succeeded)"
 
 
 class ERLMethod(BaseMethod):
-    """ERL two-attempt + reflection + memory loop as a BaseMethod."""
+    """ERL single-attempt + reflection + memory loop as a BaseMethod."""
 
     name = "erl"
 
@@ -70,6 +72,8 @@ class ERLMethod(BaseMethod):
         all_actions = []
         all_feedbacks = []
         reward = 0
+        valid_actions = valid_actions_for_env(self.env)
+        default_action = default_action_for_env(self.env)
 
         while not self.env.done:
             obs = self.env.get_observation()
@@ -77,9 +81,19 @@ class ERLMethod(BaseMethod):
                 self.client, self.model, build_step_prompt(obs),
                 disable_thinking=self.disable_thinking,
             )
-            action = parse_action_single(lm_out)
+            action, parsed_ok = parse_action_single_with_status(
+                lm_out,
+                valid_actions=valid_actions,
+                default_action=default_action,
+            )
             all_actions.append(action)
-            _, step_feedback, reward, done = self.env.step([action])
+            _, step_feedback, raw_reward, done = self.env.step([action])
+            reward = raw_reward if parsed_ok else 0
+            if not parsed_ok:
+                step_feedback = (
+                    f"Action parse failed; fallback action '{action}' was "
+                    f"executed, but counted reward is 0. {step_feedback}"
+                )
             all_feedbacks.append(step_feedback)
             if done:
                 break
@@ -90,7 +104,16 @@ class ERLMethod(BaseMethod):
 
     def run_episode(self, episode_num: int) -> dict:
         initial_obs = self.env.reset(seed=episode_num)
-        actions1, feedback1, reward1 = self._run_attempt(build_attempt1_prompt)
+        valid_actions = valid_actions_for_env(self.env)
+        action_example = action_example_for_env(self.env)
+        actions1, feedback1, reward1 = self._run_attempt(
+            lambda obs: build_attempt1_prompt(
+                obs,
+                self.memory,
+                valid_actions=valid_actions,
+                action_example=action_example,
+            )
+        )
 
         print(f"\n{'='*40}")
         print(f"=== Episode {episode_num} ===")
@@ -100,13 +123,9 @@ class ERLMethod(BaseMethod):
         print(f"[Attempt 1] Reward:   {reward1}")
 
         if reward1 >= self.reward_threshold:
-            print("[Gated] Attempt 1 succeeded. Skipping reflection and attempt 2.")
+            print("[Reflection] Episode succeeded; skipping reflection.")
             reflection = _SKIPPED
-            actions2, feedback2, reward2 = actions1, feedback1, reward1
-            gated = True
         else:
-            gated = False
-
             prompt_r = build_reflection_prompt(
                 initial_obs, actions1, feedback1, reward1, self.memory
             )
@@ -116,16 +135,7 @@ class ERLMethod(BaseMethod):
             )
             print(f"\n[Reflection] {reflection}")
 
-            self.env.reset()
-            actions2, feedback2, reward2 = self._run_attempt(
-                lambda obs: build_attempt2_prompt(obs, reflection)
-            )
-
-            print(f"\n[Attempt 2] Actions:  {actions2}")
-            print(f"[Attempt 2] Feedback: {feedback2}")
-            print(f"[Attempt 2] Reward:   {reward2}")
-
-        if reward2 >= self.reward_threshold and reflection != _SKIPPED:
+        if reflection != _SKIPPED:
             self.memory.append(reflection)
             if len(self.memory) > self.memory_size:
                 self.memory.pop(0)
@@ -137,11 +147,7 @@ class ERLMethod(BaseMethod):
             "feedback1": feedback1,
             "reward1": reward1,
             "reflection": reflection,
-            "actions2": actions2,
-            "feedback2": feedback2,
-            "reward2": reward2,
             "memory_size": len(self.memory),
-            "gated": gated,
         }
 
     # -- Full experiment ----------------------------------------------------

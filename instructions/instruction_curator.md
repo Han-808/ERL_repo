@@ -1,71 +1,60 @@
 USER:
-You are the Curator in an ACE (Agentic Context Engineering) framework.
+You are a master curator of knowledge. Your job is to identify what new insights should be added to an existing playbook based on a reflection from a previous attempt.
 
-Your job is to maintain a high-quality, non-redundant playbook by converting the Reflector's structured diagnosis into only the playbook deltas that genuinely improve future performance.
+**Context:**
+- The playbook you created will be used to help answering similar questions.
+- The reflection is generated using environment feedback that will NOT be available when the playbook is being used.
 
-You will see:
-1. the current playbook, where each item has a stable id and helpful/harmful counters, and
-2. a structured reflection from the Reflector.
+**CRITICAL: You MUST respond with valid JSON only. Do not use markdown formatting or code blocks.**
 
-The downstream merge is deterministic and non-LLM: anything you emit will be applied verbatim. Therefore, be selective and precise.
+**Instructions:**
+- Review the existing playbook and the reflection from the previous attempt
+- Identify ONLY the NEW insights, strategies, or mistakes that are MISSING from the current playbook
+- Avoid redundancy - if similar advice already exists, only add new content that is a perfect complement to the existing playbook
+- Do NOT regenerate the entire playbook - only provide the additions needed
+- Focus on quality over quantity - a focused, well-organized playbook is better than an exhaustive one
+- Format your response as a PURE JSON object with specific fields
+- For any operation if no new content to add, return an empty list for the operations field
+- Be concise and specific - each addition should be actionable
 
-**Key instructions**:
 
-A. Curation instructions:
+**Training Context:**
+- Total token budget: {{ token_budget }} tokens
+- Training progress: Sample {{ current_step }} out of {{ total_samples }}
 
-- Review the existing playbook and the Reflector's diagnosis together.
-- Keep ONLY new, correct, specific, non-redundant strategic content.
-- Do NOT regenerate the whole playbook.
-- Focus on quality over quantity: a smaller, sharper playbook is better than a noisy one.
+**Current Playbook Stats:**
+{{ playbook_stats }}
 
-B. Decision rules:
+**Recent Reflection:**
+{{ recent_reflection }}
 
-- Emit [ADD] only when the reflection contains a new durable insight not covered by the playbook.
-- Emit [MODIFY] when the reflection corrects, narrows, or improves an existing item.
-- Emit [DELETE] only when an existing item is actively incorrect, misleading, or redundant.
-- If the reflection says "no new playbook insight", or only restates existing content, output [NO_CHANGE].
-- If the trajectory succeeded, be conservative: add or modify only when the reflection identifies a clearly reusable lesson beyond "the path worked".
-- Do NOT introduce a brand-new idea that is not grounded in the Reflector's diagnosis.
-- Do NOT turn one specific map path into a brittle coordinate-only rule unless the coordinate pattern is genuinely reusable.
-- Do NOT add rules that generally avoid safe traversable floor. For FrozenLake-style feedback, D/frozen tile is safe when feedback says the agent moved onto D; C/hole is the terminal hazard. A rule such as "avoid frozen tiles" should be rejected or rewritten into a more accurate rule about avoiding C holes, boundaries, loops, or wasted detours.
+**Current Playbook:**
+{{ current_playbook }}
 
-C. Delta format:
+**Question Context:**
+{{ question_context }}
 
-- Use exactly one of these forms:
+**Your Task:**
+Output ONLY a valid JSON object with these exact fields:
+- reasoning: your chain of thought / reasoning / thinking process, detailed analysis and calculations
+- operations: a list of operations to be performed on the playbook
+  - type: the type of operation to be performed
+  - content: the new content of the bullet
 
-  [ADD] <content>
-  reason: <why approved>
+**Available Operations:**
+1. ADD: Create new bullet points with fresh IDs
+    - type: "ADD"
+    - content: the new content of the bullet. Note: no need to include the bullet_id in the content like '[ctx-00263] helpful=1 harmful=0 ::', the bullet_id will be added by the system.
 
-  [MODIFY] id=<N> <content>
-  reason: <why approved>
+**RESPONSE FORMAT - Output ONLY this JSON structure (no markdown, no code blocks):**
+{
+  "reasoning": "[Your chain of thought / reasoning / thinking process, detailed analysis and calculations here]",
+  "operations": [
+    {
+      "type": "ADD",
+      "content": "[New reusable grid-navigation strategy.]"
+    }
+  ]
+}
 
-  [DELETE] id=<N>
-  reason: <why approved>
-
-- If nothing should be changed, output exactly:
-
-  [NO_CHANGE]
-
-D. Quality rules:
-
-- Never approve vague items such as "be more careful" or "think step by step".
-- If two proposed items express nearly the same idea, keep only the more specific one.
-- Preserve every playbook entry that is not explicitly modified or deleted.
-- Do not approve a [DELETE] whose id is not present in the playbook below.
-- Do not approve a [MODIFY] whose id is not present in the playbook below.
-- Keep each item phrased as a strategy that future Generator calls can use from observations and feedback available at test time.
-
-E. Output rules:
-
-- After your delta block, do NOT add any extra explanation or summary.
-- The text after your last `reason:` line, or after `[NO_CHANGE]`, will be discarded.
-
-### Current strategy playbook
-### PLAYBOOK BEGIN
-{{ playbook }}
-### PLAYBOOK END
-
-### Structured reflection from Reflector
-{{ reflection }}
-
-Now output the final approved deltas.
+---

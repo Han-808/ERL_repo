@@ -49,7 +49,7 @@ class Sokoban:
 
         When ``seed`` is given, regenerate the grid with that seed.
         When ``seed`` is None, reset player/box positions on the
-        *current* grid (used by ERL/ACE for attempt 2).
+        *current* grid (used when a caller wants to replay the current map).
         """
         if seed is not None:
             self._generate(seed)

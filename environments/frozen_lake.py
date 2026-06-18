@@ -1,7 +1,7 @@
 """
 FrozenLake environment for Experiential Reinforcement Learning.
 
-A deterministic n×n grid world with n sampled from [2, 9] per episode
+A deterministic n×n grid world with n sampled from [2, 5] per episode
 (paper arXiv 2602.13949, Appendix B.1).  The agent sees the grid and
 the list of valid actions; no rules or symbol meanings are provided.
 
@@ -21,7 +21,7 @@ class FrozenLake:
     ACTIONS   = ["Up", "Down", "Left", "Right"]
     MAX_STEPS = 8                       # Paper Appendix B.1: fixed step budget
     MIN_N     = 2
-    MAX_N     = 9
+    MAX_N     = 5
     HOLE_PROB = 0.2                     # Density of C cells in interior
 
     _DELTAS = {
@@ -55,7 +55,7 @@ class FrozenLake:
 
         When ``seed`` is given, regenerate the grid with that seed.
         When ``seed`` is None, reset the agent position on the *current*
-        grid (used by ERL/ACE for attempt 2 after reflection).
+        grid (used when a caller wants to replay the current map).
         """
         if seed is not None:
             self._generate(seed)
@@ -265,14 +265,14 @@ if __name__ == "__main__":
         assert sym in grid, f"Agent symbol '{sym}' missing from grid"
     print("[PASS] Abstract symbol encoding correct.")
 
-    # --- Verify grid size ∈ [2, 9] ---
+    # --- Verify grid size ∈ [2, 5] ---
     for s in range(30):
         env3 = FrozenLake(seed=s)
         assert FrozenLake.MIN_N <= env3.rows <= FrozenLake.MAX_N, \
             f"Seed {s}: n={env3.rows} out of [{FrozenLake.MIN_N},{FrozenLake.MAX_N}]"
-    print("[PASS] All grid sizes in [2, 9].")
+    print("[PASS] All grid sizes in [2, 5].")
 
-    # --- Verify seed=None reuses the same grid (for attempt 2) ---
+    # --- Verify seed=None reuses the same grid ---
     env4 = FrozenLake(seed=7)
     snapshot = env4._floor
     env4.step(["Right", "Right"])

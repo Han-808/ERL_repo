@@ -6,8 +6,8 @@ No prompt strings should appear anywhere else in the codebase.
 Action format (matches the official microsoft/experiential_rl repo):
   - The LM is called once per step.
   - Output a <reason>...</reason> block, then the next action wrapped in
-    triple backticks on the last line, e.g. ```Up```.
-  - Valid actions are capitalized: Up, Down, Left, Right.
+    triple backticks on the last line, e.g. ```Up``` or ```forward```.
+  - Valid actions are supplied by the current environment.
 
 notebook_minimal builders (ACE simplified, single-LM-call per update):
   - build_notebook_agent_prompt: per-step prompt with notebook as context
@@ -15,15 +15,45 @@ notebook_minimal builders (ACE simplified, single-LM-call per update):
     emitting JSON {reasoning, operations[]} over a line-numbered notebook.
 """
 
+from common import (
+    DEFAULT_VALID_ACTIONS,
+    format_action_set,
+)
 
-def build_attempt1_prompt(observation: str) -> str:
+
+def _prompt_action_fields(valid_actions=None, action_example=None):
+    actions = tuple(str(action) for action in (valid_actions or DEFAULT_VALID_ACTIONS))
+    example = action_example or actions[0]
+    if example not in actions:
+        example = actions[0]
+    return format_action_set(actions), example
+
+
+def build_attempt1_prompt(
+    observation: str,
+    memory: list | None = None,
+    valid_actions=None,
+    action_example: str | None = None,
+) -> str:
     """
     Per-step prompt for attempt 1.
 
     Shows the current grid state and asks for the single next action using
     the reasoning structure from the official repo.
     """
+    memory_block = (
+        "Past reflections and strategies from previous episodes:"
+        + chr(10)
+        + chr(10).join(f"  {i+1}. {m}" for i, m in enumerate(memory))
+        if memory
+        else "No past reflections or strategies recorded yet."
+    )
+
+    action_set, example = _prompt_action_fields(valid_actions, action_example)
+
     return f"""{observation}
+
+{memory_block}
 
 You are an agent playing a game on a grid, acting as a reasoning engine.
 Your decisions are based on your current game rules (your best guess of how the game works)
@@ -54,10 +84,10 @@ Your response MUST strictly follow this structure:
 </reason>
 
 Then output the NEXT ACTION inside triple backticks, like this:
-```Up```
+```{example}```
 
 Always remember:
-- Valid actions: Up, Down, Left, Right.
+- Valid actions: {action_set}.
 - Think step by step, but make the final line only the next action wrapped in triple backticks.
 """
 
@@ -66,13 +96,20 @@ Always remember:
 # notebook_minimal prompts (simplified ACE: one LM call per update)
 # ----------------------------------------------------------------------
 
-def build_notebook_agent_prompt(observation: str, notebook: str) -> str:
+def build_notebook_agent_prompt(
+    observation: str,
+    notebook: str,
+    valid_actions=None,
+    action_example: str | None = None,
+) -> str:
     """
     Per-step prompt for the notebook_minimal agent.
 
     The notebook is the accumulated context; it grows across episodes.
     The agent emits a short reason block and exactly one action.
     """
+    action_set, example = _prompt_action_fields(valid_actions, action_example)
+
     return f"""{observation}
 
 Your notebook below contains knowledge accumulated from past episodes.
@@ -92,10 +129,10 @@ and which action is safest.
 </reason>
 
 Then output the NEXT ACTION inside triple backticks, like this:
-```Up```
+```{example}```
 
 Always remember:
-- Valid actions: Up, Down, Left, Right.
+- Valid actions: {action_set}.
 - The final line must be ONLY the next action wrapped in triple backticks.
 """
 
@@ -107,6 +144,7 @@ def build_notebook_updater_prompt(
     feedback: str,
     reward: int,
     reward_threshold: float,
+    updater_objective: str | None = None,
 ) -> str:
     """
     Post-episode updater prompt for notebook_minimal.
@@ -116,6 +154,11 @@ def build_notebook_updater_prompt(
     with replace / insert_after / delete ops over original line numbers.
     """
     outcome = "SUCCESS" if reward >= reward_threshold else "FAILURE"
+    objective_block = (
+        f"\n**Updater objective:**\n{updater_objective.strip()}\n"
+        if updater_objective
+        else ""
+    )
     return f"""You are a notebook updater for an agent playing a grid puzzle.
 Review the episode below and edit the notebook with insights that will
 improve the agent's future success rate.
@@ -142,6 +185,7 @@ Current notebook (line-numbered):
 <<<NOTEBOOK>>>
 {numbered_notebook}
 <<<END_NOTEBOOK>>>
+{objective_block}
 
 **Editing guidelines:**
 - Replace when an existing note is wrong or superseded.
@@ -181,11 +225,11 @@ def build_reflection_prompt(
     Reflection prompt shown after attempt 1 fails.
 
     Includes the initial grid, the full attempt-1 trajectory, environment
-    feedback, reward, and any past successful strategies from memory.
+    feedback, reward, and any past reflections from memory.
     Asks the LM to reason about failures and produce a concrete strategy.
     """
     memory_block = (
-        "Past successful strategies (use these as reference):"
+        "Past reflections and strategies (use these as reference):"
         + chr(10)
         + chr(10).join(f"  {i+1}. {m}" for i, m in enumerate(memory))
         if memory
@@ -207,44 +251,4 @@ Reflect on what went wrong and describe a concrete improved strategy in free tex
 Explain step by step how you would navigate the grid differently to achieve a higher reward.
 Reference the grid symbols (A=player, B=goal or box, C=hole or goal tile, D=floor, E=wall)
 and specific positions where your previous attempt failed.
-"""
-
-
-def build_attempt2_prompt(observation: str, reflection: str) -> str:
-    """
-    Per-step prompt for attempt 2.
-
-    Shows the current (updated) grid state and the reflection as a strategy
-    guide, then asks for the single next action in the same reasoning-plus-
-    triple-backtick format as attempt 1.
-    """
-    return f"""Original grid:
-{observation}
-
-Your reflection on the previous attempt:
-{reflection}
-
-Based on your reflection, output an improved action sequence using the same format:
-
-Your response MUST strictly follow this structure:
-<reason>
-**1. Analysis of the Current State:**
-[Summary of the board state.]
-
-**2. Prediction of the Value of Current States:**
-[Assessment of the state's strategic value.]
-- **Value:** High / Medium / Low value with justification.
-
-**3. Prediction of Immediate Consequences:**
-[Analyze ONLY the top 2 candidate actions using the "result-because" structure.]
-- **Action A:** result-because structure.
-- **Action B:** result-because structure.
-</reason>
-
-Then output the NEXT ACTION inside triple backticks, like this:
-```Up```
-
-Always remember:
-- Valid actions: Up, Down, Left, Right.
-- Think step by step, but make the final line only the next action wrapped in triple backticks.
 """

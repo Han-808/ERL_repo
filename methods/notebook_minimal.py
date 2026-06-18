@@ -15,24 +15,25 @@ to the grid-game setting:
     Playbook as the online context.
 
 Ablation switches:
-  initial_notebook = "default"  -> scaffold with section headers + hints
   initial_notebook = "empty"    -> section headers only
-
-Two attempts are retained for schema compatibility with summarize_logs /
-evaluate.py / print_episode_table, but attempt 2 is a no-op clone of
-attempt 1 (this method makes exactly one attempt per episode; the
-improvement column will always be 0).
+  initial_notebook = "default"  -> scaffold with section headers + hints
 """
 
 import json
 import re
+import time
 
 from common import (
     BaseMethod,
+    action_example_for_env,
     build_client,
     call_lm,
-    parse_action_single,
+    default_action_for_env,
+    env_metadata,
+    parse_action_single_with_status,
+    success_from_reward,
     summarize_logs,
+    valid_actions_for_env,
 )
 from prompts import (
     build_notebook_agent_prompt,
@@ -56,8 +57,8 @@ This notebook contains knowledge accumulated from past episodes. Follow it when 
 - Symbols (A, B, C, D, E, a, b) are abstract; their meaning must be inferred from environment feedback across episodes.
 
 ## Movement Rules
-- Valid actions: Up, Down, Left, Right.
-- Moving into the grid boundary keeps the agent in place.
+- Valid actions: see the current observation.
+- Use only valid action tokens.
 
 ## Strategies
 - Always analyze the grid first, then pick the action whose predicted outcome is best.
@@ -265,7 +266,7 @@ class NotebookMinimalMethod(BaseMethod):
         model: str = "qwen3-8b",
         server_url: str = "http://LOCAL_SERVER/v1",
         reward_threshold: float = 1.0,
-        initial_notebook: str = "default",
+        initial_notebook: str = "empty",
         disable_thinking: bool = False,
     ):
         self.env = env
@@ -276,7 +277,7 @@ class NotebookMinimalMethod(BaseMethod):
         self.notebook = self.initialize_context()
         self.client = build_client(server_url)
 
-        if initial_notebook != "default":
+        if initial_notebook != "empty":
             self.name = f"notebook_minimal_{initial_notebook}"
 
         print(f"Connected to LM server at {server_url}")
@@ -297,24 +298,66 @@ class NotebookMinimalMethod(BaseMethod):
 
     def _run_attempt(self):
         actions, feedbacks, reward = [], [], 0
+        trajectory_events = []
+        valid_actions = valid_actions_for_env(self.env)
+        default_action = default_action_for_env(self.env)
+        action_example = action_example_for_env(self.env)
         while not self.env.done:
+            step_index = len(actions) + 1
             obs = self.env.get_observation()
-            prompt = build_notebook_agent_prompt(obs, self.notebook)
+            prompt = build_notebook_agent_prompt(
+                obs,
+                self.notebook,
+                valid_actions=valid_actions,
+                action_example=action_example,
+            )
+            lm_started = time.time()
             raw = call_lm(
                 self.client, self.model, prompt,
                 disable_thinking=self.disable_thinking,
             )
-            action = parse_action_single(raw)
+            lm_elapsed = time.time() - lm_started
+            action, parsed_ok = parse_action_single_with_status(
+                raw,
+                valid_actions=valid_actions,
+                default_action=default_action,
+            )
             actions.append(action)
-            _, step_fb, reward, done = self.env.step([action])
+            _, step_fb, raw_reward, done = self.env.step([action])
+            reward = raw_reward if parsed_ok else 0
+            if not parsed_ok:
+                step_fb = (
+                    f"Action parse failed; fallback action '{action}' was "
+                    f"executed, but counted reward is 0. {step_fb}"
+                )
             feedbacks.append(step_fb)
+            trajectory_events.append({
+                "step": step_index,
+                "observation": obs,
+                "valid_actions": list(valid_actions),
+                "llm_output": raw,
+                "action": action,
+                "action_parse_failed": not parsed_ok,
+                "feedback": step_fb,
+                "raw_env_reward": raw_reward,
+                "reward": reward,
+                "done": done,
+                "context_type": "notebook",
+                "context_before_step": self.notebook,
+            })
+            print(
+                f"[notebook_minimal generator] step={step_index} "
+                f"action={action} reward={reward} done={done} "
+                f"lm={lm_elapsed:.1f}s"
+            )
             if done:
                 break
-        return actions, " ".join(feedbacks), reward
+        return actions, " ".join(feedbacks), reward, trajectory_events
 
     # -- Updater -------------------------------------------------------
 
     def _update_notebook(self, initial_obs, actions, feedback, reward):
+        notebook_before = self.notebook
         prompt = build_notebook_updater_prompt(
             numbered_notebook=number_lines(self.notebook),
             initial_obs=initial_obs,
@@ -323,34 +366,62 @@ class NotebookMinimalMethod(BaseMethod):
             reward=reward,
             reward_threshold=self.reward_threshold,
         )
+        lm_started = time.time()
         raw = call_lm(
             self.client, self.model, prompt,
             disable_thinking=self.disable_thinking,
         )
+        print(f"[notebook_minimal updater] lm={time.time() - lm_started:.1f}s")
+        update_info = {
+            "raw_output": raw,
+            "reasoning": "",
+            "operations": [],
+            "applied_operations": [],
+            "parse_error": None,
+            "notebook_before": notebook_before,
+            "notebook_after": notebook_before,
+            "notebook_changed": False,
+        }
         if not raw.strip():
             print("[notebook_minimal] empty updater response; no edit.")
-            return ""
+            update_info["parse_error"] = "empty updater response"
+            return update_info
         try:
             payload = extract_json_payload(raw)
         except Exception as exc:
             print(f"[notebook_minimal] JSON parse failed: {exc}")
-            return ""
+            update_info["parse_error"] = str(exc)
+            return update_info
         ops = validate_operations(payload.get("operations", []))
         reasoning = payload.get("reasoning", "")
         new_notebook, applied = apply_notebook_operations(self.notebook, ops)
         self.notebook = new_notebook
+        update_info.update({
+            "reasoning": reasoning,
+            "operations": ops,
+            "applied_operations": applied,
+            "notebook_after": self.notebook,
+            "notebook_changed": self.notebook != notebook_before,
+        })
         if applied:
             print(f"[Notebook] {len(applied)} ops applied; now "
                   f"{len(self.notebook.splitlines())} lines.")
         else:
             print("[Notebook] no ops applied.")
-        return reasoning
+        return update_info
 
     # -- Episode loop ---------------------------------------------------
 
     def run_episode(self, episode_num: int) -> dict:
         initial_obs = self.env.reset(seed=episode_num)
-        actions1, feedback1, reward1 = self._run_attempt()
+        env_info = env_metadata(self.env)
+        notebook_before_episode = self.notebook
+        actions1, feedback1, reward1, trajectory_events = self._run_attempt()
+        for event in trajectory_events:
+            event["episode"] = episode_num
+            event["method"] = self.name
+            event["env_id"] = env_info["env_id"]
+            event["env_class"] = env_info["env_class"]
 
         print(f"\n{'='*40}")
         print(f"=== Episode {episode_num} ===")
@@ -359,23 +430,30 @@ class NotebookMinimalMethod(BaseMethod):
         print(f"[Attempt 1] Feedback: {feedback1}")
         print(f"[Attempt 1] Reward:   {reward1}")
 
-        reasoning = self._update_notebook(
+        update_info = self._update_notebook(
             initial_obs, actions1, feedback1, reward1
         )
+        success = success_from_reward(reward1, self.reward_threshold)
 
-        # Single-attempt method: mirror attempt 1 into attempt 2 so the
-        # shared summarize_logs / print_episode_table schema stays valid.
         return {
             "episode":       episode_num,
+            "env":           env_info,
             "actions1":      actions1,
             "feedback1":     feedback1,
             "reward1":       reward1,
-            "reflection":    reasoning,
-            "actions2":      actions1,
-            "feedback2":     feedback1,
-            "reward2":       reward1,
+            "success":       success,
+            "trajectory_events": trajectory_events,
+            "context_before_episode": {
+                "type": "notebook",
+                "notebook": notebook_before_episode,
+            },
+            "context_after_episode": {
+                "type": "notebook",
+                "notebook": self.notebook,
+            },
+            "notebook_update": update_info,
+            "reflection":    update_info["reasoning"],
             "notebook_size": len(self.notebook.splitlines()),
-            "gated":         True,
         }
 
     # -- Run over N episodes --------------------------------------------
@@ -390,3 +468,9 @@ class NotebookMinimalMethod(BaseMethod):
             type(self.env).__name__,
             n_episodes,
         )
+
+
+class NotebookMinimalMiniGridMethod(NotebookMinimalMethod):
+    """MiniGrid-compatible alias for notebook_minimal."""
+
+    name = "notebook_minimal_minigrid"

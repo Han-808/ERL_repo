@@ -6,7 +6,7 @@ Self-Improving Language Models" — arXiv 2510.04618.
 
 Consolidates the Playbook bullet structure, Reflector diagnosis,
 Curator delta updates, the grow-and-refine de-duplication pass, and the
-two-attempt episode loop into a single module — mirroring the way
+single-attempt episode loop into a single module — mirroring the way
 methods/ace.py is organized in the appworld-context-updater template.
 
 Sections referenced below:
@@ -18,16 +18,23 @@ Sections referenced below:
 import difflib
 import json
 import re
+import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from common import (
     BaseMethod,
+    action_example_for_env,
     build_client,
     call_lm,
-    parse_action_single,
+    default_action_for_env,
+    env_metadata,
+    format_action_set,
+    parse_action_single_with_status,
     render_template,
+    success_from_reward,
     summarize_logs,
+    valid_actions_for_env,
 )
 _INSTRUCTIONS_DIR = Path(__file__).resolve().parents[1] / "instructions"
 
@@ -54,9 +61,9 @@ class PlaybookItem:
 @dataclass
 class DeltaItem:
     """A proposed change to the playbook emitted by the Curator."""
-    operation: str            # "ADD" | "MODIFY" | "DELETE"
-    id: int                   # target bullet id; -1 for ADD
-    content: str              # new text; "" for DELETE
+    operation: str            # "ADD"; original ACE curator is ADD-only
+    id: int                   # -1 for ADD
+    content: str              # new bullet text
     reason: str = ""          # explanation (for logging, not applied)
 
 
@@ -70,7 +77,7 @@ class Playbook:
 
     The playbook is the evolving context described in the paper: the
     Generator reads it, the Reflector diagnoses trajectories, the
-    Curator proposes deltas, and apply_delta merges them deterministically.
+    Curator proposes ADD-only deltas, and apply_delta merges them deterministically.
     """
 
     def __init__(self):
@@ -83,14 +90,8 @@ class Playbook:
         self._next_id += 1
         return item
 
-    def modify(self, item_id: int, new_content: str) -> bool:
-        for it in self.items:
-            if it.id == item_id:
-                it.content = new_content.strip()
-                return True
-        return False
-
-    def delete(self, item_id: int) -> bool:
+    def _remove_item(self, item_id: int) -> bool:
+        """Remove an item during deterministic duplicate pruning."""
         for i, it in enumerate(self.items):
             if it.id == item_id:
                 self.items.pop(i)
@@ -110,8 +111,8 @@ class Playbook:
                 return
 
     def apply_delta(self, deltas: list):
-        """Apply a list of DeltaItems in order and print a short summary."""
-        added = modified = deleted = skipped = 0
+        """Apply ADD-only Curator output in order and print a short summary."""
+        added = skipped = 0
         for d in deltas:
             op = d.operation.upper()
             if op == "ADD":
@@ -120,24 +121,10 @@ class Playbook:
                     added += 1
                 else:
                     skipped += 1
-            elif op == "MODIFY":
-                if self.modify(d.id, d.content):
-                    modified += 1
-                else:
-                    skipped += 1
-            elif op == "DELETE":
-                if self.delete(d.id):
-                    deleted += 1
-                else:
-                    skipped += 1
             else:
                 skipped += 1
 
-        print(
-            f"[Playbook] apply_delta: +{added} add / "
-            f"~{modified} modify / -{deleted} delete "
-            f"({skipped} skipped)"
-        )
+        print(f"[Playbook] apply_delta: +{added} add ({skipped} skipped)")
 
     def to_prompt_string(self) -> str:
         if not self.items:
@@ -166,8 +153,7 @@ class Playbook:
 # Delta-item parser
 # ----------------------------------------------------------------------
 
-_OP_RE = re.compile(r"^\s*\[(ADD|MODIFY|DELETE)\]\s*(.*)$", re.IGNORECASE)
-_ID_RE = re.compile(r"id\s*=\s*(\d+)", re.IGNORECASE)
+_OP_RE = re.compile(r"^\s*\[ADD\]\s*(.*)$", re.IGNORECASE)
 _REASON_RE = re.compile(r"^\s*reason\s*:\s*(.*)$", re.IGNORECASE)
 _JSON_FENCE_RE = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL)
 _PLAYBOOK_LINE_RE = re.compile(r"playbook|relevant entries|entry ids?", re.IGNORECASE)
@@ -177,15 +163,12 @@ def _parse_delta_items(text: str) -> list:
     """
     Parse the LM's delta output into a list of DeltaItem.
 
-    Accepted shapes (case-insensitive):
-      [ADD] <content>
-      reason: <text>
+    The original ACE curator is ADD-only. The preferred format is JSON:
 
-      [MODIFY] id=3 <content>
-      reason: <text>
+      {"reasoning": "...", "operations": [{"type": "ADD", "content": "..."}]}
 
-      [DELETE] id=3
-      reason: <text>
+    A legacy [ADD] fallback is accepted for robustness, but MODIFY/DELETE
+    are intentionally ignored.
 
     Returns an empty list for [NO_CHANGE] or when no items are found.
     Never raises.
@@ -194,6 +177,25 @@ def _parse_delta_items(text: str) -> list:
         return []
     if "[NO_CHANGE]" in text.upper():
         return []
+
+    payload = _extract_json_payload(text)
+    operations = payload.get("operations", []) if isinstance(payload, dict) else []
+    if isinstance(operations, list):
+        json_deltas = []
+        for op in operations:
+            if not isinstance(op, dict):
+                continue
+            if str(op.get("type", "")).strip().upper() != "ADD":
+                continue
+            content = str(op.get("content", "")).strip()
+            if not content:
+                continue
+            reason = str(op.get("reason", "")).strip()
+            json_deltas.append(
+                DeltaItem(operation="ADD", id=-1, content=content, reason=reason)
+            )
+        if json_deltas:
+            return json_deltas
 
     deltas = []
     current = None
@@ -204,24 +206,8 @@ def _parse_delta_items(text: str) -> list:
         if m:
             if current is not None:
                 deltas.append(current)
-            op = m.group(1).upper()
-            rest = m.group(2).strip()
-
-            target_id = -1
-            content = ""
-
-            if op in ("MODIFY", "DELETE"):
-                id_match = _ID_RE.search(rest)
-                if id_match:
-                    target_id = int(id_match.group(1))
-                    content = _ID_RE.sub("", rest, count=1).strip()
-                else:
-                    current = None
-                    continue
-            else:  # ADD
-                content = rest
-
-            current = DeltaItem(operation=op, id=target_id, content=content, reason="")
+            content = m.group(1).strip()
+            current = DeltaItem(operation="ADD", id=-1, content=content, reason="")
             continue
 
         rm = _REASON_RE.match(line)
@@ -231,7 +217,6 @@ def _parse_delta_items(text: str) -> list:
 
         if (
             current is not None
-            and current.operation in ("ADD", "MODIFY")
             and not current.content
             and line.strip()
         ):
@@ -242,11 +227,7 @@ def _parse_delta_items(text: str) -> list:
 
     cleaned = []
     for d in deltas:
-        if d.operation == "DELETE" and d.id >= 0:
-            cleaned.append(d)
-        elif d.operation in ("ADD", "MODIFY") and d.content:
-            if d.operation == "MODIFY" and d.id < 0:
-                continue
+        if d.operation == "ADD" and d.content:
             cleaned.append(d)
     return cleaned
 
@@ -255,9 +236,9 @@ def _extract_json_payload(raw: str) -> dict:
     """
     Extract a JSON object from an LM response.
 
-    The Reflector prompt asks for a fenced JSON block, but local models may
-    add small wrappers. This keeps the pipeline robust without letting the
-    Reflector emit playbook deltas directly.
+    The Reflector and Curator prompts ask for JSON, but local models may add
+    small wrappers. This keeps parsing robust while preserving the intended
+    division of labor between Reflector diagnosis and Curator ADDs.
     """
     if not raw:
         return {}
@@ -292,8 +273,38 @@ def _empty_reflection(raw: str = "") -> dict:
         "root_cause_analysis": "",
         "correct_approach": "",
         "key_insight": "no new playbook insight",
+        "bullet_tags": [],
         "playbook_feedback": [],
     }
+
+
+def _normalize_bullet_tags(payload: dict) -> list:
+    tags = payload.get("bullet_tags", [])
+    if not isinstance(tags, list):
+        tags = []
+
+    if not tags:
+        feedback = payload.get("playbook_feedback", [])
+        if isinstance(feedback, list):
+            tags = [
+                {
+                    "id": item.get("id", item.get("bullet_id")),
+                    "tag": item.get("tag", item.get("label")),
+                }
+                for item in feedback
+                if isinstance(item, dict)
+            ]
+
+    cleaned = []
+    for item in tags:
+        if not isinstance(item, dict):
+            continue
+        item_id = item.get("id", item.get("bullet_id"))
+        tag = str(item.get("tag", item.get("label", ""))).strip().lower()
+        if item_id is None or tag not in {"helpful", "harmful", "neutral"}:
+            continue
+        cleaned.append({"id": item_id, "tag": tag})
+    return cleaned
 
 
 def _normalize_reflection(raw: str) -> dict:
@@ -314,8 +325,12 @@ def _normalize_reflection(raw: str) -> dict:
         value = payload.get(key, "")
         reflection[key] = str(value).strip()
 
-    feedback = payload.get("playbook_feedback", [])
-    reflection["playbook_feedback"] = feedback if isinstance(feedback, list) else []
+    bullet_tags = _normalize_bullet_tags(payload)
+    reflection["bullet_tags"] = bullet_tags
+    reflection["playbook_feedback"] = [
+        {"id": item["id"], "label": item["tag"], "reason": ""}
+        for item in bullet_tags
+    ]
     return reflection
 
 
@@ -337,20 +352,68 @@ def _extract_generator_playbook_ids(lm_output: str, valid_ids: set) -> list:
     return sorted(found)
 
 
+_TRACE_PROMPT_HEAD_STEPS = 12
+_TRACE_PROMPT_TAIL_STEPS = 24
+_TRACE_PROMPT_RAW_CHARS = 360
+_TRACE_PROMPT_FEEDBACK_CHARS = 240
+
+
+def _truncate_for_prompt(value, max_chars: int) -> str:
+    text = "" if value is None else str(value)
+    if len(text) <= max_chars:
+        return text
+    omitted = len(text) - max_chars
+    return f"{text[:max_chars]}\n...[truncated {omitted} chars]"
+
+
+def _prompt_trace_steps(step_traces: list) -> list:
+    max_steps = _TRACE_PROMPT_HEAD_STEPS + _TRACE_PROMPT_TAIL_STEPS
+    if len(step_traces) <= max_steps:
+        return list(step_traces)
+    omitted = len(step_traces) - max_steps
+    return (
+        list(step_traces[:_TRACE_PROMPT_HEAD_STEPS])
+        + [{"omitted_steps": omitted}]
+        + list(step_traces[-_TRACE_PROMPT_TAIL_STEPS:])
+    )
+
+
 def _format_generator_trace(step_traces: list) -> str:
     if not step_traces:
         return "(no generator trace captured)"
 
     chunks = []
-    for tr in step_traces:
+    for tr in _prompt_trace_steps(step_traces):
+        if "omitted_steps" in tr:
+            chunks.append(
+                f"... {tr['omitted_steps']} middle generator steps omitted "
+                "from this updater prompt; full trace is kept in the result log."
+            )
+            continue
         ids = tr.get("playbook_ids", [])
         ids_text = ids if ids else "none"
         chunks.append(
             f"Step {tr.get('step')} action: {tr.get('action')}\n"
             f"Referenced playbook ids: {ids_text}\n"
-            f"Generator raw output:\n{tr.get('raw_output', '')}"
+            f"Reward: {tr.get('reward')} Done: {tr.get('done')}\n"
+            f"Feedback: "
+            f"{_truncate_for_prompt(tr.get('feedback', ''), _TRACE_PROMPT_FEEDBACK_CHARS)}\n"
+            "Generator raw output excerpt:\n"
+            f"{_truncate_for_prompt(tr.get('raw_output', ''), _TRACE_PROMPT_RAW_CHARS)}"
         )
     return "\n\n---\n\n".join(chunks)
+
+
+def _format_playbook_stats(playbook: Playbook) -> str:
+    if not playbook.items:
+        return "items: 0\nhelpful tags: 0\nharmful tags: 0"
+    helpful = sum(it.helpful_count for it in playbook.items)
+    harmful = sum(it.harmful_count for it in playbook.items)
+    return (
+        f"items: {len(playbook.items)}\n"
+        f"helpful tags: {helpful}\n"
+        f"harmful tags: {harmful}"
+    )
 
 
 def _apply_playbook_feedback(
@@ -374,17 +437,19 @@ def _apply_playbook_feedback(
 
     seen = set()
     feedback = reflection.get("playbook_feedback", [])
+    if not isinstance(feedback, list) or not feedback:
+        feedback = reflection.get("bullet_tags", [])
     if isinstance(feedback, list):
         for item in feedback:
             if not isinstance(item, dict):
                 continue
             try:
-                item_id = int(item.get("id"))
+                item_id = int(item.get("id", item.get("bullet_id")))
             except (TypeError, ValueError):
                 continue
             if item_id not in valid_ids or item_id in seen:
                 continue
-            label = str(item.get("label", "")).strip().lower()
+            label = str(item.get("label", item.get("tag", ""))).strip().lower()
             seen.add(item_id)
             if label == "helpful":
                 playbook.mark_helpful(item_id)
@@ -427,12 +492,23 @@ def _load_instruction(instruction_path: str) -> str:
 _GENERATOR_TEMPLATE = _load_instruction(_INSTRUCTIONS_DIR / "instruction_generator.md")
 
 
-def build_attempt2_prompt_with_playbook(observation: str, playbook: Playbook) -> str:
-    """Per-step Generator prompt for attempt 2, with the full Playbook injected."""
+def build_generator_prompt_with_playbook(
+    observation: str,
+    playbook: Playbook,
+    valid_actions=None,
+    action_example: str | None = None,
+) -> str:
+    """Per-step Generator prompt with the full Playbook injected."""
+    actions = valid_actions or valid_actions_for_env(None)
+    example = action_example or actions[0]
+    if example not in actions:
+        example = actions[0]
     return render_template(
         _GENERATOR_TEMPLATE,
         playbook=playbook.to_prompt_string(),
         observation=observation,
+        action_set=format_action_set(actions),
+        action_example=example,
     )
 
 
@@ -480,6 +556,9 @@ def run_curator(
     reflection: dict,
     playbook: Playbook,
     instruction_path: str,
+    current_step: int | str = "not provided",
+    total_samples: int | str = "not provided",
+    token_budget: int | str = "not provided",
     disable_thinking: bool = False,
 ) -> list:
     """Turn the Reflector's diagnosis into approved playbook deltas."""
@@ -490,6 +569,17 @@ def run_curator(
         template,
         playbook=playbook.to_prompt_string(),
         reflection=json.dumps(reflection, indent=2),
+        current_playbook=playbook.to_prompt_string(),
+        recent_reflection=json.dumps(reflection, indent=2),
+        playbook_stats=_format_playbook_stats(playbook),
+        question_context=(
+            "Deterministic grid-navigation task. The Generator sees the "
+            "current observation, predicts one action per step, and the "
+            "environment returns feedback plus reward for the trajectory."
+        ),
+        current_step=current_step,
+        total_samples=total_samples,
+        token_budget=token_budget,
     )
     raw = call_lm(
         lm_client, model, prompt, disable_thinking=disable_thinking
@@ -527,7 +617,7 @@ def grow_and_refine(playbook: Playbook, similarity_threshold: float = 0.85):
 
             if ratio > similarity_threshold:
                 if b.helpful_count > a.helpful_count:
-                    playbook.delete(a.id)
+                    playbook._remove_item(a.id)
                     merged += 1
                     a = playbook.items[i] if i < len(playbook.items) else None
                     if a is None:
@@ -535,7 +625,7 @@ def grow_and_refine(playbook: Playbook, similarity_threshold: float = 0.85):
                     j = i + 1
                     continue
                 else:
-                    playbook.delete(b.id)
+                    playbook._remove_item(b.id)
                     merged += 1
                     continue
             j += 1
@@ -564,25 +654,33 @@ class ACEMethod(BaseMethod):
         env,
         model: str = "qwen3-8b",
         server_url: str = "http://LOCAL_SERVER/v1",
+        updater_model: str | None = None,
+        updater_server_url: str | None = None,
         reward_threshold: float = 1.0,
         refine_every: int = 5,
         disable_thinking: bool = False,
     ):
         self.env = env
         self.model = model
+        self.updater_model = updater_model or model
         self.reward_threshold = reward_threshold
         self.refine_every = refine_every
         self.disable_thinking = disable_thinking
         self.playbook = self.initialize_context()
         self.episode_logs = []
+        self.total_episodes = "not provided"
 
         self.client = build_client(server_url)
+        self.updater_client = build_client(updater_server_url or server_url)
 
         self.reflector_instruction = str(_INSTRUCTIONS_DIR / "instruction_reflector.md")
         self.curator_instruction = str(_INSTRUCTIONS_DIR / "instruction_curator.md")
 
         print(f"Connected to LM server at {server_url}")
         print(f"Model: {self.model}")
+        if updater_model or updater_server_url:
+            print(f"Connected to updater LM server at {updater_server_url or server_url}")
+            print(f"Updater model: {self.updater_model}")
         print("ACE Method ready.")
 
     # -- BaseMethod contract ------------------------------------------------
@@ -596,41 +694,105 @@ class ACEMethod(BaseMethod):
         all_actions = []
         all_feedbacks = []
         generator_traces = []
+        trajectory_events = []
         reward = 0
+        valid_actions = valid_actions_for_env(self.env)
+        default_action = default_action_for_env(self.env)
 
         while not self.env.done:
+            step_index = len(all_actions) + 1
             obs = self.env.get_observation()
+            lm_started = time.time()
             lm_out = call_lm(
                 self.client, self.model, build_step_prompt(obs),
                 disable_thinking=self.disable_thinking,
             )
-            action = parse_action_single(lm_out)
+            lm_elapsed = time.time() - lm_started
+            action, parsed_ok = parse_action_single_with_status(
+                lm_out,
+                valid_actions=valid_actions,
+                default_action=default_action,
+            )
             all_actions.append(action)
+            _, step_feedback, raw_reward, done = self.env.step([action])
+            reward = raw_reward if parsed_ok else 0
+            if not parsed_ok:
+                step_feedback = (
+                    f"Action parse failed; fallback action '{action}' was "
+                    f"executed, but counted reward is 0. {step_feedback}"
+                )
+            all_feedbacks.append(step_feedback)
             generator_traces.append({
-                "step": len(all_actions),
+                "step": step_index,
+                "observation": obs,
                 "action": action,
+                "action_parse_failed": not parsed_ok,
                 "playbook_ids": _extract_generator_playbook_ids(
                     lm_out, {it.id for it in self.playbook.items}
                 ),
                 "raw_output": lm_out,
+                "feedback": step_feedback,
+                "raw_env_reward": raw_reward,
+                "reward": reward,
+                "done": done,
             })
-            _, step_feedback, reward, done = self.env.step([action])
-            all_feedbacks.append(step_feedback)
+            trajectory_events.append({
+                "step": step_index,
+                "observation": obs,
+                "valid_actions": list(valid_actions),
+                "llm_output": lm_out,
+                "action": action,
+                "action_parse_failed": not parsed_ok,
+                "feedback": step_feedback,
+                "raw_env_reward": raw_reward,
+                "reward": reward,
+                "done": done,
+                "context_type": "playbook",
+                "playbook_before_step": self.playbook.to_dict(),
+            })
+            print(
+                f"[ACE generator] step={step_index} action={action} "
+                f"reward={reward} done={done} lm={lm_elapsed:.1f}s"
+            )
             if done:
                 break
 
-        return all_actions, " ".join(all_feedbacks), reward, generator_traces
+        return (
+            all_actions,
+            " ".join(all_feedbacks),
+            reward,
+            generator_traces,
+            trajectory_events,
+        )
 
     # -- Episode loop -------------------------------------------------------
 
     def run_episode(self, episode_num: int) -> dict:
         initial_obs = self.env.reset(seed=episode_num)
+        env_info = env_metadata(self.env)
+        playbook_before_episode = self.playbook.to_dict()
         # Online ACE evaluation: solve each new stage using the playbook
         # accumulated before seeing this stage. The running attempt-1 curve is
         # therefore the average pass rate over the first K online stages.
-        actions1, feedback1, reward1, generator_trace1 = self._run_attempt(
-            lambda obs: build_attempt2_prompt_with_playbook(obs, self.playbook)
+        (
+            actions1,
+            feedback1,
+            reward1,
+            generator_trace1,
+            trajectory_events,
+        ) = self._run_attempt(
+            lambda obs: build_generator_prompt_with_playbook(
+                obs,
+                self.playbook,
+                valid_actions=valid_actions_for_env(self.env),
+                action_example=action_example_for_env(self.env),
+            )
         )
+        for event in trajectory_events:
+            event["episode"] = episode_num
+            event["method"] = self.name
+            event["env_id"] = env_info["env_id"]
+            event["env_class"] = env_info["env_class"]
 
         print(f"\n{'='*40}")
         print(f"=== Episode {episode_num} ===")
@@ -640,7 +802,7 @@ class ACEMethod(BaseMethod):
         print(f"[Attempt 1] Reward:   {reward1}")
 
         reflection = run_reflector(
-            self.client, self.model,
+            self.updater_client, self.updater_model,
             initial_obs, actions1, feedback1, reward1,
             _format_generator_trace(generator_trace1),
             self.playbook, self.reflector_instruction,
@@ -662,8 +824,10 @@ class ACEMethod(BaseMethod):
             )
 
         approved_deltas = run_curator(
-            self.client, self.model,
+            self.updater_client, self.updater_model,
             reflection, self.playbook, self.curator_instruction,
+            current_step=episode_num,
+            total_samples=self.total_episodes,
             disable_thinking=self.disable_thinking,
         )
         print(f"[Curator] Approved {len(approved_deltas)} delta items")
@@ -674,43 +838,34 @@ class ACEMethod(BaseMethod):
         if self.refine_every > 0 and episode_num % self.refine_every == 0:
             grow_and_refine(self.playbook)
 
-        if reward1 >= self.reward_threshold:
-            print("[Gated] Attempt 1 succeeded. Skipping retry.")
-            actions2, feedback2, reward2 = actions1, feedback1, reward1
-            generator_trace2 = generator_trace1
-            gated = True
-        else:
-            gated = False
-            self.env.reset()
-            actions2, feedback2, reward2, generator_trace2 = self._run_attempt(
-                lambda obs: build_attempt2_prompt_with_playbook(obs, self.playbook)
-            )
-
-            print(f"\n[Attempt 2] Actions:  {actions2}")
-            print(f"[Attempt 2] Feedback: {feedback2}")
-            print(f"[Attempt 2] Reward:   {reward2}")
-
         return {
             "episode": episode_num,
+            "env": env_info,
             "actions1": actions1,
             "feedback1": feedback1,
             "reward1": reward1,
+            "success": success_from_reward(reward1, self.reward_threshold),
+            "trajectory_events": trajectory_events,
+            "context_before_episode": {
+                "type": "playbook",
+                "playbook": playbook_before_episode,
+            },
+            "context_after_episode": {
+                "type": "playbook",
+                "playbook": self.playbook.to_dict(),
+            },
             "generator_trace1": generator_trace1,
             "reflection": reflection,
             "playbook_feedback": feedback_stats,
             "delta_items": [asdict(d) for d in approved_deltas],
             "playbook": self.playbook.to_dict(),
-            "actions2": actions2,
-            "feedback2": feedback2,
-            "reward2": reward2,
-            "generator_trace2": generator_trace2,
             "playbook_size": len(self.playbook.items),
-            "gated": gated,
         }
 
     # -- Full experiment ----------------------------------------------------
 
     def run(self, n_episodes: int) -> dict:
+        self.total_episodes = n_episodes
         all_logs = []
         for ep in range(1, n_episodes + 1):
             all_logs.append(self.run_episode(ep))
