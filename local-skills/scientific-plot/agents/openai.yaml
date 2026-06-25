@@ -1,0 +1,6 @@
+interface:
+  display_name: "Scientific Plot"
+  short_description: "Publication-quality scientific plotting guidance."
+  default_prompt: "Use $scientific-plot to create a publication-quality figure from this experiment data."
+policy:
+  allow_implicit_invocation: true

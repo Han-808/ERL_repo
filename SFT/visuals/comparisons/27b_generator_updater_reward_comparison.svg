@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="700" viewBox="0 0 1120 700">
+<rect width="100%" height="100%" fill="white"/>
+<style>text{font-family:Arial, Helvetica, sans-serif; fill:#222} .title{font-size:20px;font-weight:700}.small{font-size:12px}.label{font-size:14px}.tick{font-size:12px;fill:#444}</style>
+<text x="95" y="36" class="title">27B Generator: Updater Ablation Reward Comparison</text>
+<text x="95" y="60" class="small">Bar = macro-average raw reward over 4 common games: Empty, MemoryS11, MemoryS13, FourRooms. Points = game-level means.</text>
+<line x1="95" y1="580.0" x2="850" y2="580.0" stroke="#D9D9D9" stroke-width="0.8"/>
+<text x="83" y="584.0" text-anchor="end" class="tick">0.0</text>
+<line x1="95" y1="497.5" x2="850" y2="497.5" stroke="#D9D9D9" stroke-width="0.8"/>
+<text x="83" y="501.5" text-anchor="end" class="tick">0.1</text>
+<line x1="95" y1="415.0" x2="850" y2="415.0" stroke="#D9D9D9" stroke-width="0.8"/>
+<text x="83" y="419.0" text-anchor="end" class="tick">0.2</text>
+<line x1="95" y1="332.5" x2="850" y2="332.5" stroke="#D9D9D9" stroke-width="0.8"/>
+<text x="83" y="336.5" text-anchor="end" class="tick">0.3</text>
+<line x1="95" y1="250.0" x2="850" y2="250.0" stroke="#D9D9D9" stroke-width="0.8"/>
+<text x="83" y="254.0" text-anchor="end" class="tick">0.4</text>
+<line x1="95" y1="167.5" x2="850" y2="167.5" stroke="#D9D9D9" stroke-width="0.8"/>
+<text x="83" y="171.5" text-anchor="end" class="tick">0.5</text>
+<line x1="95" y1="85" x2="95" y2="580" stroke="#222" stroke-width="1.2"/>
+<line x1="95" y1="580" x2="850" y2="580" stroke="#222" stroke-width="1.2"/>
+<rect x="164.2" y="266.7" width="113.2" height="313.3" rx="3" fill="#8C8C8C" opacity="0.78" stroke="#333" stroke-width="0.6">
+<title>27B gen / no updater common-4 avg reward=0.3797</title></rect>
+<text x="220.8" y="257.7" text-anchor="middle" class="label" font-weight="700">0.380</text>
+<circle cx="178.8" cy="138.2" r="6" fill="#2563EB" stroke="white" stroke-width="1.5">
+<title>27B gen / no updater | Empty 5x5: mean=0.5356, n=6</title></circle>
+<circle cx="206.8" cy="201.3" r="6" fill="#16A34A" stroke="white" stroke-width="1.5">
+<title>27B gen / no updater | Memory S11: mean=0.4591, n=6</title></circle>
+<circle cx="234.8" cy="188.6" r="6" fill="#0891B2" stroke="white" stroke-width="1.5">
+<title>27B gen / no updater | Memory S13: mean=0.4744, n=6</title></circle>
+<circle cx="262.8" cy="538.8" r="6" fill="#EA580C" stroke="white" stroke-width="1.5">
+<title>27B gen / no updater | FourRooms: mean=0.0500, n=6</title></circle>
+<text x="220.8" y="615" text-anchor="middle" class="label">No</text>
+<text x="220.8" y="635" text-anchor="middle" class="label">updater</text>
+<rect x="415.9" y="238.1" width="113.2" height="341.9" rx="3" fill="#4E79A7" opacity="0.78" stroke="#333" stroke-width="0.6">
+<title>27B gen / 4B updater common-4 avg reward=0.4144</title></rect>
+<text x="472.5" y="229.1" text-anchor="middle" class="label" font-weight="700">0.414</text>
+<circle cx="430.5" cy="48.1" r="6" fill="#2563EB" stroke="white" stroke-width="1.5">
+<title>27B gen / 4B updater | Empty 5x5: mean=0.6447, n=6</title></circle>
+<circle cx="458.5" cy="161.8" r="6" fill="#16A34A" stroke="white" stroke-width="1.5">
+<title>27B gen / 4B updater | Memory S11: mean=0.5069, n=6</title></circle>
+<circle cx="486.5" cy="205.2" r="6" fill="#0891B2" stroke="white" stroke-width="1.5">
+<title>27B gen / 4B updater | Memory S13: mean=0.4543, n=6</title></circle>
+<circle cx="514.5" cy="537.2" r="6" fill="#EA580C" stroke="white" stroke-width="1.5">
+<title>27B gen / 4B updater | FourRooms: mean=0.0519, n=6</title></circle>
+<text x="472.5" y="615" text-anchor="middle" class="label">4B</text>
+<text x="472.5" y="635" text-anchor="middle" class="label">updater</text>
+<rect x="667.5" y="215.7" width="113.2" height="364.3" rx="3" fill="#F28E2B" opacity="0.78" stroke="#333" stroke-width="0.6">
+<title>27B gen / 8B updater common-4 avg reward=0.4416</title></rect>
+<text x="724.2" y="206.7" text-anchor="middle" class="label" font-weight="700">0.442</text>
+<circle cx="682.2" cy="-46.6" r="6" fill="#2563EB" stroke="white" stroke-width="1.5">
+<title>27B gen / 8B updater | Empty 5x5: mean=0.7595, n=6</title></circle>
+<circle cx="710.2" cy="194.7" r="6" fill="#16A34A" stroke="white" stroke-width="1.5">
+<title>27B gen / 8B updater | Memory S11: mean=0.4671, n=6</title></circle>
+<circle cx="738.2" cy="190.3" r="6" fill="#0891B2" stroke="white" stroke-width="1.5">
+<title>27B gen / 8B updater | Memory S13: mean=0.4724, n=6</title></circle>
+<circle cx="766.2" cy="524.2" r="6" fill="#EA580C" stroke="white" stroke-width="1.5">
+<title>27B gen / 8B updater | FourRooms: mean=0.0676, n=6</title></circle>
+<text x="724.2" y="615" text-anchor="middle" class="label">8B</text>
+<text x="724.2" y="635" text-anchor="middle" class="label">updater</text>
+<text x="472.5" y="670" text-anchor="middle" class="label">Updater setting with fixed 27B generator</text>
+<text x="24" y="332.5" text-anchor="middle" class="label" transform="rotate(-90 24,332.5)">Macro-average raw reward</text>
+<rect x="878" y="97" width="230" height="172" rx="8" fill="white" stroke="#B8B8B8" opacity="0.96"/>
+<text x="892" y="122" class="small" font-weight="700">Game-level points</text>
+<circle cx="900" cy="144" r="6" fill="#2563EB" stroke="white" stroke-width="1.3"/>
+<text x="916" y="149" class="small">Empty 5x5</text>
+<circle cx="900" cy="168" r="6" fill="#16A34A" stroke="white" stroke-width="1.3"/>
+<text x="916" y="173" class="small">Memory S11</text>
+<circle cx="900" cy="192" r="6" fill="#0891B2" stroke="white" stroke-width="1.3"/>
+<text x="916" y="197" class="small">Memory S13</text>
+<circle cx="900" cy="216" r="6" fill="#EA580C" stroke="white" stroke-width="1.3"/>
+<text x="916" y="221" class="small">FourRooms</text>
+<text x="892" y="251" class="small">No-updater has only 4 completed games.</text>
+<text x="220.8" y="668" text-anchor="middle" class="small">all-avail avg 0.380</text>
+<text x="220.8" y="684" text-anchor="middle" class="small">games=4</text>
+<text x="472.5" y="668" text-anchor="middle" class="small">all-avail avg 0.323</text>
+<text x="472.5" y="684" text-anchor="middle" class="small">games=6</text>
+<text x="724.2" y="668" text-anchor="middle" class="small">all-avail avg 0.357</text>
+<text x="724.2" y="684" text-anchor="middle" class="small">games=6</text>
+</svg>
