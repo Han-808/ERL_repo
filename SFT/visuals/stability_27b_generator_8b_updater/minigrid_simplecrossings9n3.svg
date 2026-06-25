@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="86.0" y="42.0" font-family="Inter, Arial, sans-serif" font-size="26" font-weight="700" text-anchor="start" fill="#111827">SimpleCrossingS9N3</text>
+<text x="86.0" y="68.0" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="400" text-anchor="start" fill="#4b5563">Running average original reward by repeat; final mean=0.292, std=0.044, n=5</text>
+<line x1="86" y1="630.00" x2="900" y2="630.00" stroke="#e5e7eb" stroke-width="1"/>
+<text x="74.0" y="635.0" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="end" fill="#4b5563">0.00</text>
+<line x1="86" y1="492.00" x2="900" y2="492.00" stroke="#e5e7eb" stroke-width="1"/>
+<text x="74.0" y="497.0" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="end" fill="#4b5563">0.25</text>
+<line x1="86" y1="354.00" x2="900" y2="354.00" stroke="#e5e7eb" stroke-width="1"/>
+<text x="74.0" y="359.0" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="end" fill="#4b5563">0.50</text>
+<line x1="86" y1="216.00" x2="900" y2="216.00" stroke="#e5e7eb" stroke-width="1"/>
+<text x="74.0" y="221.0" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="end" fill="#4b5563">0.75</text>
+<line x1="86" y1="78.00" x2="900" y2="78.00" stroke="#e5e7eb" stroke-width="1"/>
+<text x="74.0" y="83.0" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="end" fill="#4b5563">1.00</text>
+<line x1="86.00" y1="78" x2="86.00" y2="630" stroke="#f3f4f6" stroke-width="1"/>
+<text x="86.0" y="660.0" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="middle" fill="#4b5563">1</text>
+<line x1="257.37" y1="78" x2="257.37" y2="630" stroke="#f3f4f6" stroke-width="1"/>
+<text x="257.4" y="660.0" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="middle" fill="#4b5563">5</text>
+<line x1="471.58" y1="78" x2="471.58" y2="630" stroke="#f3f4f6" stroke-width="1"/>
+<text x="471.6" y="660.0" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="middle" fill="#4b5563">10</text>
+<line x1="685.79" y1="78" x2="685.79" y2="630" stroke="#f3f4f6" stroke-width="1"/>
+<text x="685.8" y="660.0" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="middle" fill="#4b5563">15</text>
+<line x1="900.00" y1="78" x2="900.00" y2="630" stroke="#f3f4f6" stroke-width="1"/>
+<text x="900.0" y="660.0" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="middle" fill="#4b5563">20</text>
+<line x1="86" y1="630" x2="900" y2="630" stroke="#111827" stroke-width="1.4"/>
+<line x1="86" y1="78" x2="86" y2="630" stroke="#111827" stroke-width="1.4"/>
+<text x="493.0" y="696.0" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="400" text-anchor="middle" fill="#374151">Episode</text>
+<text x="24" y="354.0" font-family="Inter, Arial, sans-serif" font-size="15" text-anchor="middle" fill="#374151" transform="rotate(-90 24 354.0)">Running average original reward</text>
+<polyline points="86.00,159.27 128.84,151.60 171.68,280.40 214.53,367.80 257.37,420.24 300.21,416.61 343.05,447.10 385.89,420.51 428.74,443.79 471.58,443.39 514.42,453.11 557.26,467.85 600.11,480.32 642.95,471.74 685.79,458.68 728.63,444.47 771.47,425.98 814.32,437.31 857.16,423.40 900.00,433.73" fill="none" stroke="#2563eb" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="900.00" cy="433.73" r="3.5" fill="#2563eb"/>
+<polyline points="86.00,154.67 128.84,271.97 171.68,348.38 214.53,418.78 257.37,461.03 300.21,442.68 343.05,442.71 385.89,413.99 428.74,431.86 471.58,443.39 514.42,460.36 557.26,474.49 600.11,486.46 642.95,496.71 685.79,477.69 728.63,487.21 771.47,486.68 814.32,477.69 857.16,476.10 900.00,483.80" fill="none" stroke="#dc2626" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="900.00" cy="483.80" r="3.5" fill="#dc2626"/>
+<polyline points="86.00,522.67 128.84,448.30 171.68,508.87 214.53,539.15 257.37,521.75 300.21,518.32 343.05,480.39 385.89,442.17 428.74,428.45 471.58,448.61 514.42,458.68 557.26,472.96 600.11,485.04 642.95,495.40 685.79,478.00 728.63,487.50 771.47,474.86 814.32,458.95 857.16,467.95 900.00,461.79" fill="none" stroke="#16a34a" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="900.00" cy="461.79" r="3.5" fill="#16a34a"/>
+<polyline points="86.00,312.60 128.84,281.93 171.68,397.96 214.53,455.97 257.37,490.77 300.21,513.98 343.05,477.32 385.89,460.18 428.74,479.05 471.58,494.15 514.42,506.50 557.26,516.79 600.11,499.31 642.95,508.65 685.79,516.74 728.63,523.82 771.47,530.06 814.32,520.45 857.16,499.59 900.00,497.75" fill="none" stroke="#9333ea" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="900.00" cy="497.75" r="3.5" fill="#9333ea"/>
+<polyline points="86.00,424.53 128.84,414.57 171.68,486.38 214.53,522.28 257.37,543.83 300.21,495.32 343.05,514.56 385.89,509.63 428.74,523.01 471.58,498.75 514.42,510.68 557.26,492.00 600.11,472.77 642.95,484.00 685.79,481.06 728.63,472.93 771.47,455.74 814.32,455.54 857.16,458.19 900.00,466.78" fill="none" stroke="#ea580c" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="900.00" cy="466.78" r="3.5" fill="#ea580c"/>
+<text x="934.0" y="86.0" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="700" text-anchor="start" fill="#111827">Repeats</text>
+<line x1="934" y1="112.0" x2="964" y2="112.0" stroke="#2563eb" stroke-width="3"/>
+<text x="974.0" y="117.0" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#374151">run 0: final=0.356</text>
+<line x1="934" y1="140.0" x2="964" y2="140.0" stroke="#dc2626" stroke-width="3"/>
+<text x="974.0" y="145.0" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#374151">run 1: final=0.265</text>
+<line x1="934" y1="168.0" x2="964" y2="168.0" stroke="#16a34a" stroke-width="3"/>
+<text x="974.0" y="173.0" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#374151">run 2: final=0.305</text>
+<line x1="934" y1="196.0" x2="964" y2="196.0" stroke="#9333ea" stroke-width="3"/>
+<text x="974.0" y="201.0" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#374151">run 3: final=0.240</text>
+<line x1="934" y1="224.0" x2="964" y2="224.0" stroke="#ea580c" stroke-width="3"/>
+<text x="974.0" y="229.0" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#374151">run 5: final=0.296</text>
+</svg>

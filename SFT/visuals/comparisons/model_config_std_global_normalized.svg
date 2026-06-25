@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1580" height="835" viewBox="0 0 1580 835">
+<rect width="100%" height="100%" fill="white"/>
+<style>text{font-family:Arial, Helvetica, sans-serif; fill:#222} .small{font-size:12px}.tick{font-size:12px; fill:#444}.label{font-size:14px}.title{font-size:20px; font-weight:700}.note{font-size:12px; fill:#333}</style>
+<text x="90" y="38" class="title">Normalized Reward STD by Stability Model Config</text>
+<text x="90" y="62" class="small">Y = per-game STD / global average STD across available stability cells; colors are game configs; SFT_complete excluded. Global avg raw STD = 0.0637</text>
+<line x1="90" y1="685.0" x2="1190" y2="685.0" stroke="#D9D9D9" stroke-width="0.8"/>
+<text x="78" y="689.0" text-anchor="end" class="tick">0.0</text>
+<line x1="90" y1="594.2" x2="1190" y2="594.2" stroke="#D9D9D9" stroke-width="0.8"/>
+<text x="78" y="598.2" text-anchor="end" class="tick">0.5</text>
+<line x1="90" y1="503.5" x2="1190" y2="503.5" stroke="#D9D9D9" stroke-width="0.8"/>
+<text x="78" y="507.5" text-anchor="end" class="tick">1.0</text>
+<line x1="90" y1="412.7" x2="1190" y2="412.7" stroke="#D9D9D9" stroke-width="0.8"/>
+<text x="78" y="416.7" text-anchor="end" class="tick">1.5</text>
+<line x1="90" y1="322.0" x2="1190" y2="322.0" stroke="#D9D9D9" stroke-width="0.8"/>
+<text x="78" y="326.0" text-anchor="end" class="tick">2.0</text>
+<line x1="90" y1="231.2" x2="1190" y2="231.2" stroke="#D9D9D9" stroke-width="0.8"/>
+<text x="78" y="235.2" text-anchor="end" class="tick">2.5</text>
+<line x1="90" y1="140.5" x2="1190" y2="140.5" stroke="#D9D9D9" stroke-width="0.8"/>
+<text x="78" y="144.5" text-anchor="end" class="tick">3.0</text>
+<line x1="90" y1="86" x2="90" y2="685" stroke="#222" stroke-width="1.2"/>
+<line x1="90" y1="685" x2="1190" y2="685" stroke="#222" stroke-width="1.2"/>
+<text x="181.7" y="720" text-anchor="middle" class="label">14B gen</text>
+<text x="181.7" y="738" text-anchor="middle" class="label">14B upd</text>
+<rect x="111.6" y="468.1" width="21.0" height="216.9" fill="#4E79A7" stroke="white" stroke-width="0.8">
+<title>14B gen / 14B upd | Empty 5x5: STD=0.0762, normalized=1.20, n=6</title></rect>
+<rect x="135.4" y="435.0" width="21.0" height="250.0" fill="#59A14F" stroke="white" stroke-width="0.8">
+<title>14B gen / 14B upd | Memory S11: STD=0.0878, normalized=1.38, n=6</title></rect>
+<rect x="159.3" y="318.8" width="21.0" height="366.2" fill="#76B7B2" stroke="white" stroke-width="0.8">
+<title>14B gen / 14B upd | Memory S13: STD=0.1286, normalized=2.02, n=6</title></rect>
+<rect x="183.1" y="624.4" width="21.0" height="60.6" fill="#F28E2B" stroke="white" stroke-width="0.8">
+<title>14B gen / 14B upd | FourRooms: STD=0.0213, normalized=0.33, n=6</title></rect>
+<rect x="206.9" y="514.4" width="21.0" height="170.6" fill="#E15759" stroke="white" stroke-width="0.8">
+<title>14B gen / 14B upd | SimpleCrossing: STD=0.0599, normalized=0.94, n=6</title></rect>
+<rect x="230.8" y="641.6" width="21.0" height="43.4" fill="#B07AA1" stroke="white" stroke-width="0.8">
+<title>14B gen / 14B upd | DistShift1: STD=0.0152, normalized=0.24, n=6</title></rect>
+<text x="365.0" y="720" text-anchor="middle" class="label">27B gen</text>
+<text x="365.0" y="738" text-anchor="middle" class="label">8B upd</text>
+<rect x="294.9" y="592.3" width="21.0" height="92.7" fill="#4E79A7" stroke="white" stroke-width="0.8">
+<title>27B gen / 8B upd | Empty 5x5: STD=0.0326, normalized=0.51, n=6</title></rect>
+<rect x="318.8" y="565.3" width="21.0" height="119.7" fill="#59A14F" stroke="white" stroke-width="0.8">
+<title>27B gen / 8B upd | Memory S11: STD=0.0420, normalized=0.66, n=6</title></rect>
+<rect x="342.6" y="508.9" width="21.0" height="176.1" fill="#76B7B2" stroke="white" stroke-width="0.8">
+<title>27B gen / 8B upd | Memory S13: STD=0.0618, normalized=0.97, n=6</title></rect>
+<rect x="366.4" y="524.7" width="21.0" height="160.3" fill="#F28E2B" stroke="white" stroke-width="0.8">
+<title>27B gen / 8B upd | FourRooms: STD=0.0563, normalized=0.88, n=6</title></rect>
+<rect x="390.3" y="560.0" width="21.0" height="125.0" fill="#E15759" stroke="white" stroke-width="0.8">
+<title>27B gen / 8B upd | SimpleCrossing: STD=0.0439, normalized=0.69, n=5</title></rect>
+<text x="400.8" y="555.0" text-anchor="middle" class="small" transform="rotate(-90 400.8,555.0)">n=5</text>
+<rect x="414.1" y="488.3" width="21.0" height="196.7" fill="#B07AA1" stroke="white" stroke-width="0.8">
+<title>27B gen / 8B upd | DistShift1: STD=0.0691, normalized=1.08, n=6</title></rect>
+<text x="548.3" y="720" text-anchor="middle" class="label">8B gen</text>
+<text x="548.3" y="738" text-anchor="middle" class="label">27B upd</text>
+<rect x="478.3" y="433.5" width="21.0" height="251.5" fill="#4E79A7" stroke="white" stroke-width="0.8">
+<title>8B gen / 27B upd | Empty 5x5: STD=0.0883, normalized=1.39, n=6</title></rect>
+<rect x="502.1" y="177.9" width="21.0" height="507.1" fill="#59A14F" stroke="white" stroke-width="0.8">
+<title>8B gen / 27B upd | Memory S11: STD=0.1780, normalized=2.79, n=6</title></rect>
+<rect x="525.9" y="359.0" width="21.0" height="326.0" fill="#76B7B2" stroke="white" stroke-width="0.8">
+<title>8B gen / 27B upd | Memory S13: STD=0.1145, normalized=1.80, n=6</title></rect>
+<rect x="549.8" y="555.2" width="21.0" height="129.8" fill="#F28E2B" stroke="white" stroke-width="0.8">
+<title>8B gen / 27B upd | FourRooms: STD=0.0456, normalized=0.72, n=6</title></rect>
+<rect x="573.6" y="568.8" width="21.0" height="116.2" fill="#E15759" stroke="white" stroke-width="0.8">
+<title>8B gen / 27B upd | SimpleCrossing: STD=0.0408, normalized=0.64, n=6</title></rect>
+<rect x="597.4" y="595.6" width="21.0" height="89.4" fill="#B07AA1" stroke="white" stroke-width="0.8">
+<title>8B gen / 27B upd | DistShift1: STD=0.0314, normalized=0.49, n=6</title></rect>
+<text x="731.7" y="720" text-anchor="middle" class="label">14B gen</text>
+<text x="731.7" y="738" text-anchor="middle" class="label">8B upd</text>
+<rect x="661.6" y="373.1" width="21.0" height="311.9" fill="#4E79A7" stroke="white" stroke-width="0.8">
+<title>14B gen / 8B upd | Empty 5x5: STD=0.1095, normalized=1.72, n=6</title></rect>
+<rect x="685.4" y="451.2" width="21.0" height="233.8" fill="#59A14F" stroke="white" stroke-width="0.8">
+<title>14B gen / 8B upd | Memory S11: STD=0.0821, normalized=1.29, n=6</title></rect>
+<rect x="709.3" y="381.9" width="21.0" height="303.1" fill="#76B7B2" stroke="white" stroke-width="0.8">
+<title>14B gen / 8B upd | Memory S13: STD=0.1064, normalized=1.67, n=6</title></rect>
+<rect x="733.1" y="591.0" width="21.0" height="94.0" fill="#F28E2B" stroke="white" stroke-width="0.8">
+<title>14B gen / 8B upd | FourRooms: STD=0.0330, normalized=0.52, n=6</title></rect>
+<rect x="756.9" y="575.2" width="21.0" height="109.8" fill="#E15759" stroke="white" stroke-width="0.8">
+<title>14B gen / 8B upd | SimpleCrossing: STD=0.0386, normalized=0.61, n=6</title></rect>
+<rect x="780.8" y="628.4" width="21.0" height="56.6" fill="#B07AA1" stroke="white" stroke-width="0.8">
+<title>14B gen / 8B upd | DistShift1: STD=0.0199, normalized=0.31, n=6</title></rect>
+<text x="915.0" y="720" text-anchor="middle" class="label">27B gen</text>
+<text x="915.0" y="738" text-anchor="middle" class="label">no upd</text>
+<rect x="844.9" y="557.4" width="21.0" height="127.6" fill="#4E79A7" stroke="white" stroke-width="0.8">
+<title>27B gen / no upd | Empty 5x5: STD=0.0448, normalized=0.70, n=6</title></rect>
+<rect x="868.8" y="440.8" width="21.0" height="244.2" fill="#59A14F" stroke="white" stroke-width="0.8">
+<title>27B gen / no upd | Memory S11: STD=0.0857, normalized=1.35, n=6</title></rect>
+<rect x="892.6" y="465.4" width="21.0" height="219.6" fill="#76B7B2" stroke="white" stroke-width="0.8">
+<title>27B gen / no upd | Memory S13: STD=0.0771, normalized=1.21, n=6</title></rect>
+<rect x="916.4" y="584.7" width="21.0" height="100.3" fill="#F28E2B" stroke="white" stroke-width="0.8">
+<title>27B gen / no upd | FourRooms: STD=0.0352, normalized=0.55, n=6</title></rect>
+<text x="950.8" y="677" text-anchor="middle" transform="rotate(-90 950.8,677)" class="small" fill="#777">N/A</text>
+<text x="974.6" y="677" text-anchor="middle" transform="rotate(-90 974.6,677)" class="small" fill="#777">N/A</text>
+<text x="1098.3" y="720" text-anchor="middle" class="label">27B gen</text>
+<text x="1098.3" y="738" text-anchor="middle" class="label">4B upd</text>
+<rect x="1028.3" y="526.2" width="21.0" height="158.8" fill="#4E79A7" stroke="white" stroke-width="0.8">
+<title>27B gen / 4B upd | Empty 5x5: STD=0.0557, normalized=0.87, n=6</title></rect>
+<rect x="1052.1" y="400.4" width="21.0" height="284.6" fill="#59A14F" stroke="white" stroke-width="0.8">
+<title>27B gen / 4B upd | Memory S11: STD=0.0999, normalized=1.57, n=6</title></rect>
+<rect x="1075.9" y="475.7" width="21.0" height="209.3" fill="#76B7B2" stroke="white" stroke-width="0.8">
+<title>27B gen / 4B upd | Memory S13: STD=0.0735, normalized=1.15, n=6</title></rect>
+<rect x="1099.8" y="578.0" width="21.0" height="107.0" fill="#F28E2B" stroke="white" stroke-width="0.8">
+<title>27B gen / 4B upd | FourRooms: STD=0.0376, normalized=0.59, n=6</title></rect>
+<rect x="1123.6" y="627.6" width="21.0" height="57.4" fill="#E15759" stroke="white" stroke-width="0.8">
+<title>27B gen / 4B upd | SimpleCrossing: STD=0.0202, normalized=0.32, n=4</title></rect>
+<text x="1134.1" y="622.6" text-anchor="middle" class="small" transform="rotate(-90 1134.1,622.6)">n=4</text>
+<rect x="1147.4" y="529.5" width="21.0" height="155.5" fill="#B07AA1" stroke="white" stroke-width="0.8">
+<title>27B gen / 4B upd | DistShift1: STD=0.0546, normalized=0.86, n=6</title></rect>
+<text x="640.0" y="805" text-anchor="middle" class="label">Model config</text>
+<text x="22" y="385.5" text-anchor="middle" class="label" transform="rotate(-90 22,385.5)">STD / global average STD</text>
+<rect x="94" y="80" width="378" height="92" rx="6" fill="white" stroke="#D0D0D0" opacity="0.95"/>
+<text x="102" y="98" class="small" font-weight="700">Game config</text>
+<rect x="102" y="108" width="13" height="13" fill="#4E79A7"/>
+<text x="121" y="119" class="small">Empty 5x5</text>
+<rect x="102" y="128" width="13" height="13" fill="#59A14F"/>
+<text x="121" y="139" class="small">Memory S11</text>
+<rect x="102" y="148" width="13" height="13" fill="#76B7B2"/>
+<text x="121" y="159" class="small">Memory S13</text>
+<rect x="287" y="108" width="13" height="13" fill="#F28E2B"/>
+<text x="306" y="119" class="small">FourRooms</text>
+<rect x="287" y="128" width="13" height="13" fill="#E15759"/>
+<text x="306" y="139" class="small">SimpleCrossing</text>
+<rect x="287" y="148" width="13" height="13" fill="#B07AA1"/>
+<text x="306" y="159" class="small">DistShift1</text>
+<rect x="1218" y="98" width="338" height="170" rx="8" fill="white" stroke="#B8B8B8" opacity="0.96"/>
+<text x="1232" y="123" class="small" font-weight="700">Global avg STD by config</text>
+<text x="1232" y="141" class="small">descending, raw STD</text>
+<text x="1232" y="164" class="small">1. 0.0831  8B gen / 27B upd</text>
+<text x="1232" y="182" class="small">2. 0.0649  14B gen / 8B upd</text>
+<text x="1232" y="200" class="small">3. 0.0648  14B gen / 14B upd</text>
+<text x="1232" y="218" class="small">4. 0.0607  27B gen / no upd</text>
+<text x="1232" y="236" class="small">5. 0.0569  27B gen / 4B upd</text>
+<text x="1232" y="254" class="small">6. 0.0509  27B gen / 8B upd</text>
+</svg>
